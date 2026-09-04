@@ -18,6 +18,7 @@ const state = {
   guestVoice: new Map(),  // peerId -> { track, stream }
   guestScreen: new Map(), // peerId -> { stream, tracks:[...], name }
   live: new Map(),        // peerId -> startedAt (quem esta transmitindo agora, host ou convidado)
+  salas: [],              // [{id, name}] — cada pessoa está em uma delas
   grid: null,              // Grid: um card por transmissao ao vivo na sala
   screen: null,       // MediaStream da captura
   mic: null,          // MediaStream do microfone
@@ -280,10 +281,32 @@ function connect() {
 
   sig.on("welcome", (m) => {
     state.me = m.you;
+    state.salas = m.room.salas || [];
     for (const l of m.room.live || []) state.live.set(l.id, l.startedAt);
     for (const p of m.room.peers) if (p.id !== m.you.id) addGuest(p);
     (m.chat || []).forEach(addChat);
+    renderSalas();
     renderPeople();
+  });
+
+  sig.on("salas", (m) => {
+    state.salas = m.salas || [];
+    renderSalas();
+    renderPeople();
+  });
+
+  // Alguém mudou de sala (por conta própria, ou pelo sorteio). É aqui que a
+  // separação de áudio acontece de verdade: os encaminhamentos são refeitos.
+  sig.on("sala-troca", (m) => {
+    if (m.id === state.me?.id) state.me.sala = m.sala;
+    const e = state.peers.get(m.id);
+    if (e) e.info.sala = m.sala;
+    applySalas();
+    renderSalas();
+  });
+
+  sig.on("sorteio", () => {
+    toast("Times sorteados.", "ok");
   });
 
   // Alguem (host ou convidado) comecou ou parou de transmitir. Guiar a saida
@@ -369,14 +392,6 @@ function addGuest(info, { relayOnly = false } = {}) {
   if (state.mic) tx.voice.sender.replaceTrack(state.mic.getAudioTracks()[0]).catch(() => {});
   applyBitrate(entry);
 
-  // Repassa a voz e a tela de quem já estiver transmitindo para este convidado novo.
-  for (const [gid, v] of state.guestVoice) {
-    if (gid !== info.id) relayTrack(entry, `voice:${gid}`, v.track, v.stream);
-  }
-  for (const [gid, g] of state.guestScreen) {
-    if (gid !== info.id) for (const t of g.tracks) relayTrack(entry, `screen:${gid}`, t, g.stream);
-  }
-
   trackRouter(peer, {
     voice: (stream, ownerId, name, track) => onGuestVoice(entry, stream, track),
     screen: (stream, ownerId, name, track) => onGuestScreen(entry, stream, ownerId, name, track),
@@ -390,7 +405,8 @@ function addGuest(info, { relayOnly = false } = {}) {
   });
   peer.on("dead", () => retryOverRelay(entry));
 
-  broadcastMap();
+  // Manda o que já estiver rolando (respeitando as salas) e avisa o mapa.
+  applySalas();
 }
 
 /**
@@ -446,12 +462,8 @@ function onGuestVoice(entry, stream, track) {
   audio.srcObject = stream;
   audio.play().catch(() => {});
 
-  // Os outros ouvem.
-  for (const other of state.peers.values()) {
-    if (other.info.id !== entry.info.id) relayTrack(other, `voice:${entry.info.id}`, track, stream);
-  }
   track.onended = () => dropVoice(entry.info.id);
-  broadcastMap();
+  applySalas(); // quem ouve quem depende da sala
 }
 
 function dropVoice(id) {
@@ -471,13 +483,9 @@ function onGuestScreen(entry, stream, ownerId, name, track) {
   if (!g) { g = { stream, tracks: [], name }; state.guestScreen.set(ownerId, g); }
   if (!g.tracks.includes(track)) g.tracks.push(track);
 
-  state.grid.attach(ownerId, stream, name || entry.info.name);
-  for (const other of state.peers.values()) {
-    if (other.info.id !== ownerId) relayTrack(other, `screen:${ownerId}`, track, stream);
-  }
+  g.name = name || entry.info.name;
   track.onended = () => teardownGuestScreen(ownerId);
-  updateEmptyState();
-  renderPeople();
+  applySalas(); // quem vê essa tela depende da sala
 }
 
 function teardownGuestScreen(id) {
@@ -653,14 +661,82 @@ function setScreen(stream) {
   updateBadge();
 }
 
+/* ---------------------------------------------------------- salas ----- */
+
+function minhaSala() {
+  return state.me?.sala || state.salas[0]?.id || "geral";
+}
+
+/** Em que sala está fulano — inclusive eu. */
+function salaDe(id) {
+  if (id === myId()) return minhaSala();
+  return state.peers.get(id)?.info.sala ?? null;
+}
+
+/**
+ * Recalcula TUDO que depende de quem está em qual sala: o que eu envio, o
+ * que eu retransmito entre os outros, o que eu escuto e o que eu vejo.
+ *
+ * Centralizado de propósito. Espalhar "só se for da mesma sala" por cada
+ * ponto que mexe em faixa é como se esquece um — e esquecer um aqui é o Time
+ * A ouvindo o Time B, que é justamente o que a separação existe pra evitar.
+ */
+function applySalas() {
+  const eu = minhaSala();
+
+  for (const entry of state.peers.values()) {
+    const comigo = entry.info.sala === eu;
+
+    // minha tela e minha voz só saem pra quem está na minha sala
+    const v = comigo && state.screen ? state.screen.getVideoTracks()[0] : null;
+    const a = comigo && state.screen ? state.screen.getAudioTracks()[0] : null;
+    const mic = comigo && state.mic ? state.mic.getAudioTracks()[0] : null;
+    entry.tx.video.sender.replaceTrack(v || null).catch(() => {});
+    entry.tx.sys.sender.replaceTrack(a || null).catch(() => {});
+    entry.tx.voice.sender.replaceTrack(mic || null).catch(() => {});
+    if (v) applyBitrate(entry);
+
+    // e o que eu repasso dos outros: só entre quem divide a sala com ele
+    for (const [gid, voz] of state.guestVoice) {
+      const chave = `voice:${gid}`;
+      if (gid !== entry.info.id && salaDe(gid) === entry.info.sala) {
+        relayTrack(entry, chave, voz.track, voz.stream);
+      } else {
+        removeRelayKey(entry, chave);
+      }
+    }
+    for (const [gid, tela] of state.guestScreen) {
+      const chave = `screen:${gid}`;
+      if (gid !== entry.info.id && salaDe(gid) === entry.info.sala) {
+        for (const t of tela.tracks) relayTrack(entry, chave, t, tela.stream);
+      } else {
+        removeRelayKey(entry, chave);
+      }
+    }
+  }
+
+  // o que EU escuto: silencia a voz de quem não está na minha sala
+  for (const [gid, audio] of state.audioEls) {
+    audio.muted = salaDe(gid) !== eu;
+  }
+
+  // e o que EU vejo: tela de quem saiu da minha sala sai da grade
+  for (const [gid, tela] of state.guestScreen) {
+    if (salaDe(gid) === eu) {
+      state.grid.attach(gid, tela.stream, tela.name || state.peers.get(gid)?.info.name);
+    } else {
+      state.grid.remove(gid);
+    }
+  }
+
+  updateEmptyState();
+  broadcastMap();
+  renderPeople();
+}
+
 function attachScreen(entry) {
-  const stream = state.screen;
-  if (!stream) return;
-  const v = stream.getVideoTracks()[0];
-  const a = stream.getAudioTracks()[0];
-  entry.tx.video.sender.replaceTrack(v || null).catch(() => {});
-  entry.tx.sys.sender.replaceTrack(a || null).catch(() => {});
-  applyBitrate(entry);
+  if (!state.screen) return;
+  applySalas();
 }
 
 function stopScreen(silent = false) {
@@ -973,7 +1049,21 @@ function wireUi() {
     input.value = "";
   });
 
-  // sala
+  // salas
+  $("#btn-sortear").addEventListener("click", () => {
+    const times = state.salas.filter((s) => s.id !== state.salas[0]?.id).slice(0, 2);
+    if (times.length < 2) return toast("Precisa de duas salas além da primeira pra sortear.", "err");
+    if (state.peers.size < 1) return toast("Ninguém pra sortear ainda.", "err");
+    state.signal.send({ t: "admin", action: "sortear", a: times[0].id, b: times[1].id });
+  });
+  $("#btn-reunir").addEventListener("click", () => {
+    state.signal.send({ t: "admin", action: "reunir", id: state.salas[0]?.id });
+  });
+  $("#btn-nova-sala").addEventListener("click", () => {
+    const name = prompt("Nome da sala nova:");
+    if (name?.trim()) state.signal.send({ t: "admin", action: "sala-criar", name: name.trim() });
+  });
+
   $("#btn-mute-all").addEventListener("click", () => {
     state.signal.send({ t: "admin", action: "mute-all" });
     toast("Todos silenciados", "ok");
@@ -1424,6 +1514,8 @@ async function runNetTest() {
 
 /* --------------------------------------------------------- pessoas ---- */
 
+/** A lista é agrupada por sala, como os canais de voz do Discord: cada sala
+ *  com quem está dentro dela, e a sua em destaque. */
 function renderPeople() {
   const list = $("#people-list");
   const me = {
@@ -1431,10 +1523,28 @@ function renderPeople() {
     name: `${state.settings.display_name || "Você"} (você)`,
     role: "host",
     muted: !state.micOn,
+    sala: minhaSala(),
   };
-  const rows = [rowFor(me, true), ...[...state.peers.values()].map((e) => rowFor(e.info, false, e))];
+  const todos = [{ info: me, eu: true }, ...[...state.peers.values()].map((e) => ({ info: e.info, entry: e }))];
+  const salas = state.salas.length ? state.salas : [{ id: minhaSala(), name: "Geral" }];
 
-  list.replaceChildren(...rows);
+  const blocos = salas.map((sala) => {
+    const dentro = todos.filter((p) => (p.info.sala || salas[0].id) === sala.id);
+    const cabecalho = el("div", { class: `sala-hd ${sala.id === minhaSala() ? "aqui" : ""}` },
+      icon("users"),
+      el("span", { class: "sala-nome" }, sala.name),
+      el("span", { class: "sala-count" }, String(dentro.length)));
+
+    // clicar na sala move você pra ela — igual entrar num canal de voz
+    cabecalho.addEventListener("click", () => {
+      if (sala.id !== minhaSala()) state.signal?.send({ t: "sala", id: sala.id });
+    });
+
+    return el("div", { class: "sala-bloco" }, cabecalho,
+      ...dentro.map((p) => rowFor(p.info, !!p.eu, p.entry)));
+  });
+
+  list.replaceChildren(...blocos);
   if (!state.peers.size) {
     list.append(
       el("div", { class: "empty" }, icon("users"),
@@ -1445,6 +1555,9 @@ function renderPeople() {
   updateBitrateHint(Number(state.settings.bitrate_kbps));
 }
 
+/** As salas aparecem dentro da própria lista de pessoas. */
+const renderSalas = renderPeople;
+
 function rowFor(info, isMe, entry) {
   const status = entry?.conn === "connected" ? "conectado"
     : entry?.conn === "failed" ? `falhou — ${entry.failReason || "sem rota"}`
@@ -1454,6 +1567,17 @@ function rowFor(info, isMe, entry) {
     icon(info.muted ? "micOff" : "mic"));
 
   const acts = el("div", { class: "acts" });
+  if (!isMe && entry && state.salas.length > 1) {
+    // Mover uma pessoa específica de sala. Um select em vez de menu próprio:
+    // é o controle que já existe pronto e cabe na linha.
+    const mover = el("select", { class: "sala-pick", title: "Mover de sala" },
+      ...state.salas.map((s) => el("option", { value: s.id }, s.name)));
+    mover.value = info.sala || state.salas[0].id;
+    mover.addEventListener("click", (e) => e.stopPropagation());
+    mover.addEventListener("change", (e) =>
+      state.signal.send({ t: "admin", action: "mover", id: info.id, sala: e.target.value }));
+    acts.append(mover);
+  }
   if (!isMe && entry) {
     const mute = el("button", { class: "icon-btn", title: "Pedir silêncio" }, icon("micOff"));
     mute.addEventListener("click", () =>

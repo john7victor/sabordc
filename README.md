@@ -88,6 +88,25 @@ a sua transmissão (se tiver uma rolando) e desconecta quem estiver na sua
 sala — o app avisa antes. Pra voltar, é só clicar em **"← Meu painel"** no
 canto da sala.
 
+### Salas e sorteio de times
+
+A lista de pessoas é agrupada por **sala**, como os canais de voz do Discord.
+Já vêm três criadas — *Geral*, *Time A* e *Time B* — e dá pra criar mais no
+**+**. Clicar no nome de uma sala te move pra ela.
+
+**Sala separa áudio e vídeo.** Você só ouve, e só vê as telas, de quem está na
+mesma sala que você. É o ponto todo: dá pra dividir os times antes da partida
+sem um time escutar a call do outro.
+
+**Sortear times** embaralha todo mundo que está conectado e joga metade em
+cada sala de time — inclusive o host, que também joga. Com número ímpar, um
+time fica com uma pessoa a menos. **Reunir** traz todo mundo de volta pra
+primeira sala.
+
+Quem está transmitindo continua transmitindo ao mudar de sala; o que muda é
+quem recebe. Passando o mouse numa pessoa aparece um seletor pra mover ela
+sozinha, sem sortear todo mundo.
+
 ### Atualização
 
 Ao abrir o painel, o app pergunta ao GitHub qual é a última versão publicada

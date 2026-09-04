@@ -309,6 +309,45 @@
 .panel-foot { padding: 12px; border-top: 1px solid var(--line-soft); flex: none; }
 .panel .chat-form { padding: 12px; margin: 0; }
 
+/* --------------------------------------------------- salas (canais) --- */
+.sala-bloco { margin-bottom: 10px; }
+.sala-hd {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 7px; margin-bottom: 2px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.sala-hd:hover { background: var(--panel-2); color: var(--txt-dim); }
+.sala-hd svg { width: 13px; height: 13px; }
+.sala-nome {
+  flex: 1; min-width: 0;
+  font-size: 11px; font-weight: 650;
+  letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sala-count { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+/* a sala em que você está */
+.sala-hd.aqui { color: var(--accent); background: var(--accent-soft); }
+/* Recuo por borda, e não por padding: a barra lateral é estreita e cada
+   pixel gasto aqui vira nome de gente cortado com "..." */
+.sala-bloco .person { padding-left: 9px; margin-left: 7px; border-left: 1px solid var(--line-soft); }
+
+.sala-acts { display: flex; gap: 6px; margin-bottom: 10px; }
+.sala-acts .btn { flex: 1; height: 30px; font-size: 12px; padding: 0 8px; }
+.sala-acts .btn-ghost { flex: 0 0 32px; font-size: 16px; line-height: 1; }
+
+/* Só aparece ao passar o mouse na linha (junto com silenciar/remover), então
+   não pode reservar largura o tempo todo — o nome vem primeiro. */
+.sala-pick {
+  height: 24px; width: 26px; max-width: 26px;
+  padding: 0 0 0 4px; font-size: 11px;
+  color: transparent;   /* o texto da opção não cabe; fica só a setinha */
+}
+.person:hover .sala-pick { width: 84px; max-width: 84px; color: var(--txt-dim); }
+.person .acts { flex: none; }
+
 /* ------------------------------------------------------------ pessoas - */
 .person {
   display: flex; align-items: center; gap: 10px;

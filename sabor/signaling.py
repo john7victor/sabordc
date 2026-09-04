@@ -10,6 +10,7 @@ de link.
 from __future__ import annotations
 
 import asyncio
+import random
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -19,6 +20,16 @@ from aiohttp import WSMsgType, web
 
 MAX_CHAT = 500
 MAX_NAME = 24
+MAX_SALAS = 12
+
+# Salas que ja existem quando o app abre. A primeira e onde todo mundo cai.
+# As duas de time existem pra o sorteio ter pra onde mandar as pessoas sem
+# ninguem precisar criar nada antes de jogar.
+SALAS_PADRAO = [
+    {"id": "geral", "name": "Geral"},
+    {"id": "time-a", "name": "Time A"},
+    {"id": "time-b", "name": "Time B"},
+]
 
 
 @dataclass
@@ -29,6 +40,7 @@ class Peer:
     ws: web.WebSocketResponse
     joined_at: float = field(default_factory=time.time)
     muted: bool = True
+    sala: str = SALAS_PADRAO[0]["id"]
 
     def public(self) -> dict[str, Any]:
         return {
@@ -36,6 +48,7 @@ class Peer:
             "name": self.name,
             "role": self.role,
             "muted": self.muted,
+            "sala": self.sala,
             "joinedAt": int(self.joined_at * 1000),
         }
 
@@ -50,8 +63,12 @@ class Room:
         # peer.id -> quando comecou a transmitir. Qualquer um pode estar aqui,
         # nao so o host: e o que permite mais de uma transmissao na mesma sala.
         self.live: dict[str, float] = {}
+        self.salas: list[dict[str, str]] = [dict(s) for s in SALAS_PADRAO]
         self.on_change = on_change
         self._lock = asyncio.Lock()
+
+    def sala_existe(self, sala_id: str) -> bool:
+        return any(s["id"] == sala_id for s in self.salas)
 
     # -- consultas ---------------------------------------------------------
     @property
@@ -65,6 +82,7 @@ class Room:
     def snapshot(self) -> dict[str, Any]:
         return {
             "peers": [p.public() for p in self.peers.values()],
+            "salas": [dict(s) for s in self.salas],
             "locked": self.locked,
             # Lista, nao mais um booleano: varias pessoas podem estar
             # transmitindo ao mesmo tempo na mesma sala.
@@ -187,12 +205,27 @@ class Room:
             })
             self._changed()
 
+        elif kind == "sala":
+            # Qualquer um pode trocar de sala sozinho, como num canal de voz.
+            await self._mover(peer.id, str(msg.get("id", "")))
+
         elif kind == "admin":
             if peer.role == "host":
                 await self._admin(msg)
 
         elif kind == "ping":
             await self.send(peer, {"t": "pong", "ts": msg.get("ts")})
+
+    # -- salas -------------------------------------------------------------
+    async def _mover(self, peer_id: str, sala_id: str) -> None:
+        peer = self.peers.get(peer_id)
+        if not peer or not self.sala_existe(sala_id) or peer.sala == sala_id:
+            return
+        peer.sala = sala_id
+        # Todo mundo precisa saber: quem esta numa sala so ouve quem esta na
+        # mesma, e e o painel do host que refaz os encaminhamentos de audio.
+        await self.broadcast({"t": "sala-troca", "id": peer.id, "sala": sala_id})
+        self._changed()
 
     async def _admin(self, msg: dict[str, Any]) -> None:
         action = msg.get("action")
@@ -216,6 +249,62 @@ class Room:
         elif action == "mute-all":
             for g in self.guests:
                 await self.send(g, {"t": "force-mute"})
+
+        elif action == "sala-criar":
+            nome = str(msg.get("name", "")).strip()[:MAX_NAME] or "Sala"
+            if len(self.salas) < MAX_SALAS:
+                self.salas.append({"id": secrets.token_hex(3), "name": nome})
+                await self.broadcast({"t": "salas", "salas": self.salas})
+                self._changed()
+
+        elif action == "sala-renomear":
+            sala = next((s for s in self.salas if s["id"] == msg.get("id")), None)
+            nome = str(msg.get("name", "")).strip()[:MAX_NAME]
+            if sala and nome:
+                sala["name"] = nome
+                await self.broadcast({"t": "salas", "salas": self.salas})
+                self._changed()
+
+        elif action == "sala-apagar":
+            sala_id = str(msg.get("id", ""))
+            # A primeira sala nunca some: e o destino de quem fica sem sala.
+            if sala_id and self.salas and sala_id != self.salas[0]["id"]:
+                self.salas = [s for s in self.salas if s["id"] != sala_id]
+                for p in list(self.peers.values()):
+                    if p.sala == sala_id:
+                        await self._mover(p.id, self.salas[0]["id"])
+                await self.broadcast({"t": "salas", "salas": self.salas})
+                self._changed()
+
+        elif action == "mover":
+            await self._mover(str(msg.get("id", "")), str(msg.get("sala", "")))
+
+        elif action == "sortear":
+            await self._sortear(str(msg.get("a", "")), str(msg.get("b", "")))
+
+        elif action == "reunir":
+            destino = str(msg.get("id", "")) or (self.salas[0]["id"] if self.salas else "")
+            if self.sala_existe(destino):
+                for p in list(self.peers.values()):
+                    await self._mover(p.id, destino)
+
+    async def _sortear(self, sala_a: str, sala_b: str) -> None:
+        """Embaralha quem esta conectado e joga metade em cada sala.
+
+        Inclui o host: ele joga junto, entao deixar ele de fora daria times
+        de tamanho diferente. Quem esta transmitindo tambem entra no sorteio —
+        a transmissao acompanha a pessoa pra sala nova.
+        """
+        if not (self.sala_existe(sala_a) and self.sala_existe(sala_b)):
+            return
+        pessoas = list(self.peers.values())
+        if len(pessoas) < 2:
+            return
+        random.shuffle(pessoas)
+        meio = len(pessoas) // 2  # com numero impar, a sala A fica com um a menos
+        for i, p in enumerate(pessoas):
+            await self._mover(p.id, sala_a if i < meio else sala_b)
+        await self.broadcast({"t": "sorteio", "a": sala_a, "b": sala_b})
 
 
 async def ws_handler(request: web.Request) -> web.WebSocketResponse:

@@ -33,6 +33,7 @@ const state = {
   people: new Map(),
   voices: new Map(),   // ownerId -> { audio, stream, meter, level }
   live: new Map(),     // peerId -> startedAt (quem esta transmitindo agora)
+  salas: [],           // [{id, name}] — como os canais de voz do Discord
   grid: null,           // Grid: um card por transmissao ao vivo na sala
   ownScreen: null,      // MediaStream da NOSSA própria transmissão, se ligada
   ownScreenTx: [],
@@ -178,6 +179,7 @@ function connect(name) {
 
   sig.on("welcome", (m) => {
     state.me = m.you;
+    state.salas = m.room.salas || [];
     state.people.clear();
     for (const p of m.room.peers) state.people.set(p.id, p);
     for (const l of m.room.live || []) state.live.set(l.id, l.startedAt);
@@ -229,6 +231,24 @@ function connect(name) {
   });
 
   sig.on("peer-update", (m) => { state.people.set(m.peer.id, m.peer); renderPeople(); });
+
+  sig.on("salas", (m) => { state.salas = m.salas || []; renderPeople(); });
+
+  sig.on("sala-troca", (m) => {
+    const p = state.people.get(m.id);
+    if (p) p.sala = m.sala;
+    if (m.id === state.me?.id) {
+      state.me.sala = m.sala;
+      const nome = state.salas.find((s) => s.id === m.sala)?.name || m.sala;
+      toast(`Você foi para ${nome}.`, "ok");
+      // Quem ficou pra trás some da grade: o host para de mandar essas telas.
+      for (const [id] of [...state.grid.tiles]) {
+        if (id !== state.me.id && state.people.get(id)?.sala !== m.sala) state.grid.remove(id);
+      }
+      updateWaitingState();
+    }
+    renderPeople();
+  });
   sig.on("state", (m) => {
     const p = state.people.get(m.id);
     if (p) { p.muted = m.muted; renderPeople(); }
@@ -640,21 +660,40 @@ function renderPeople() {
   const people = [...state.people.values()].sort((a, b) =>
     a.role === "host" ? -1 : b.role === "host" ? 1 : a.name.localeCompare(b.name));
 
-  list.replaceChildren(
-    ...people.map((p) => {
-      const mine = p.id === state.me?.id;
-      const muted = mine ? !state.micOn : p.muted;
-      const av = avatarFor(p);
-      if (state.voices.get(p.id)?.speaking) av.classList.add("speaking");
-      return el("div", { class: "person" }, av,
-        el("div", { class: "meta" },
-          el("div", { class: "nm" }, mine ? `${p.name} (você)` : p.name,
-            state.live.has(p.id) && el("span", { class: "live-dot", title: "Transmitindo" })),
-          el("div", { class: "sub" }, p.role === "host" ? "host" : "convidado")),
-        el("div", { class: `mic-state ${muted ? "off" : "on"}` }, icon(muted ? "micOff" : "mic")));
-    })
-  );
+  // Agrupado por sala, como os canais de voz do Discord. Clicar numa sala
+  // entra nela — e a partir daí você só ouve e vê quem está lá.
+  if (state.salas.length) {
+    const minha = state.me?.sala || state.salas[0].id;
+    list.replaceChildren(...state.salas.map((sala) => {
+      const dentro = people.filter((p) => (p.sala || state.salas[0].id) === sala.id);
+      const hd = el("div", { class: `sala-hd ${sala.id === minha ? "aqui" : ""}` },
+        icon("users"),
+        el("span", { class: "sala-nome" }, sala.name),
+        el("span", { class: "sala-count" }, String(dentro.length)));
+      hd.addEventListener("click", () => {
+        if (sala.id !== minha) state.signal?.send({ t: "sala", id: sala.id });
+      });
+      return el("div", { class: "sala-bloco" }, hd, ...dentro.map(linhaPessoa));
+    }));
+    $("#people-count").textContent = people.length;
+    return;
+  }
+
+  list.replaceChildren(...people.map(linhaPessoa));
   $("#people-count").textContent = people.length;
+}
+
+function linhaPessoa(p) {
+  const mine = p.id === state.me?.id;
+  const muted = mine ? !state.micOn : p.muted;
+  const av = avatarFor(p);
+  if (state.voices.get(p.id)?.speaking) av.classList.add("speaking");
+  return el("div", { class: "person" }, av,
+    el("div", { class: "meta" },
+      el("div", { class: "nm" }, mine ? `${p.name} (você)` : p.name,
+        state.live.has(p.id) && el("span", { class: "live-dot", title: "Transmitindo" })),
+      el("div", { class: "sub" }, p.role === "host" ? "host" : "convidado")),
+    el("div", { class: `mic-state ${muted ? "off" : "on"}` }, icon(muted ? "micOff" : "mic")));
 }
 
 /* ------------------------------------------------------------- chat --- */
