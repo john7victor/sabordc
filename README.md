@@ -144,9 +144,15 @@ O repositório é público de propósito: assim a consulta funciona sem token
 nenhum. Num repositório privado, o app precisaria carregar um segredo embutido
 pra conseguir perguntar — e qualquer pessoa extrai isso de um `.exe`.
 
-Sem internet, com o GitHub fora do ar ou sem release publicada, a checagem
-falha em silêncio: não é assunto que justifique atrapalhar quem só quer
-transmitir.
+Na checagem automática, sem internet ou com o GitHub fora do ar ela falha em
+silêncio: não é assunto que justifique atrapalhar quem só quer transmitir.
+
+**Mas silêncio confunde**, porque "está tudo atualizado" e "a checagem
+quebrou" parecem a mesma coisa. Por isso existe o botão de **procurar
+atualização** no rodapé da coluna da esquerda (e outro em *Ajustes →
+Versão*): pedido na mão, ele sempre responde — que há versão nova, que você
+já está na última, ou que não conseguiu falar com o GitHub. Ajustes também
+mostra a versão que está rodando.
 
 ### Amigos em outra cidade (o caso normal)
 

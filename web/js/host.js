@@ -97,15 +97,38 @@ function isNewer(candidate, current) {
  * ou com o repositório ainda sem release nenhuma, o app não tem nada de útil
  * a dizer — e não é motivo pra encher o painel de erro.
  */
-async function checkUpdate() {
+async function checkUpdate({ manual = false } = {}) {
+  // Sem `manual`, a checagem é silenciosa quando não há novidade. Só que
+  // silêncio de "está tudo atualizado" é idêntico a silêncio de "a checagem
+  // quebrou" — por isso o botão em Ajustes conta o resultado dos dois jeitos.
+  // Escreve em Ajustes E mostra um aviso passageiro: o botão do rodapé fica
+  // sempre à mão, e de lá não dá pra ver o texto que está dentro da aba.
+  const diga = (texto, ruim = false, passageiro = true) => {
+    if (!manual) return;
+    const el = $("#update-status");
+    el.textContent = texto;
+    el.className = ruim ? "hint warn" : "hint";
+    if (passageiro) toast(texto, ruim ? "err" : "ok");
+  };
+
   try {
+    diga("Perguntando ao GitHub…", false, false); // esse não vira aviso na tela
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      diga(`O GitHub respondeu ${res.status}. Tente de novo daqui a pouco.`, true);
+      return;
+    }
     const release = await res.json();
-    if (release.draft || release.prerelease) return;
-    if (!isNewer(release.tag_name, state.boot.version)) return;
+    if (release.draft || release.prerelease) {
+      diga("A última versão publicada ainda é um rascunho.", true);
+      return;
+    }
+    if (!isNewer(release.tag_name, state.boot.version)) {
+      diga(`Você já está na versão mais nova (${state.boot.version}).`);
+      return;
+    }
 
     state.update = {
       tag: release.tag_name,
@@ -121,8 +144,11 @@ async function checkUpdate() {
     $("#update-get").addEventListener("click", onUpdateAction);
     renderUpdate();
     maybeDownloadUpdate();
-  } catch {
-    /* sem internet, ou o GitHub fora do ar: segue a vida */
+    diga(`Versão ${release.tag_name} disponível — veja o aviso na coluna da esquerda.`);
+  } catch (err) {
+    // Na checagem automática segue a vida em silêncio: sem internet não é
+    // motivo pra atrapalhar quem só quer transmitir. No clique, fala.
+    diga(`Não consegui falar com o GitHub (${err.name}). Sem internet?`, true);
   }
 }
 
@@ -1000,6 +1026,8 @@ function wireUi() {
     renderAudioShare();
   });
   renderAudioShare();
+  $("#btn-update-check").replaceChildren(icon("refresh"));
+  $("#btn-update-check").addEventListener("click", () => checkUpdate({ manual: true }));
   $("#btn-preview").replaceChildren(icon("eye"));
   $("#btn-preview").addEventListener("click", () => setPreview(!state.previewOn));
   $("#btn-settings").replaceChildren(icon("gear"));
@@ -1129,6 +1157,8 @@ function wireUi() {
     }
     toast("TURN salvo — vale para quem entrar a partir de agora.", "ok");
   });
+  $("#versao-atual").textContent = `Sabor DC ${state.boot.version}`;
+  $("#btn-checar-update").addEventListener("click", () => checkUpdate({ manual: true }));
   $("#btn-nettest").addEventListener("click", runNetTest);
   $("#btn-open-browser").addEventListener("click", () => state.api?.open_in_browser());
   $("#btn-tunnel").addEventListener("click", toggleTunnel);
