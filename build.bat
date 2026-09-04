@@ -42,7 +42,7 @@ if not exist dist mkdir dist
 
 echo.
 echo ==========================================================
-echo  Instalador: dist\Sabor DC-1.0.0-setup.exe
+echo  Instalador: dist\ (o .exe com a versao definida em installer\sabor.iss)
 echo  Portatil:   %STAGE%\SABOR\
 echo ==========================================================
 echo.

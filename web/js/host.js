@@ -62,6 +62,59 @@ function streamMap() {
   return map;
 }
 
+/* ==================================================== atualização ===== */
+
+// Repositório público de propósito: a API de releases responde sem token
+// nenhum. Num repo privado o app teria que carregar um segredo embutido, e
+// qualquer um extrai isso de um .exe.
+const REPO = "john7victor/sabordc";
+
+/** "v1.2.3" / "1.2.3" -> [1,2,3]. Pedaço não numérico vira 0. */
+function parseVersion(text) {
+  return String(text || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+}
+
+function isNewer(candidate, current) {
+  const a = parseVersion(candidate);
+  const b = parseVersion(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] || 0) - (b[i] || 0);
+    if (diff) return diff > 0;
+  }
+  return false;
+}
+
+/**
+ * Pergunta ao GitHub qual é a última versão publicada e mostra o aviso se
+ * for mais nova que esta. Falha em silêncio de propósito: sem internet, com
+ * a API fora do ar ou com o repositório ainda sem release nenhuma, o app não
+ * tem nada de útil a dizer — e não é motivo pra encher o painel de erro.
+ */
+async function checkUpdate() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return;
+    const release = await res.json();
+    if (release.draft || release.prerelease) return;
+    if (!isNewer(release.tag_name, state.boot.version)) return;
+
+    $("#update-version").textContent =
+      `${release.tag_name} · você está na ${state.boot.version}`;
+    $("#update-card").hidden = false;
+    $("#update-get").addEventListener("click", () => {
+      const url = release.html_url;
+      if (state.api?.open_url) state.api.open_url(url);
+      else window.open(url, "_blank", "noopener");
+    });
+    $("#update-dismiss").replaceChildren(icon("x"));
+    $("#update-dismiss").addEventListener("click", () => { $("#update-card").hidden = true; });
+  } catch {
+    /* sem internet, ou o GitHub fora do ar: segue a vida */
+  }
+}
+
 /* ======================================================== bootstrap === */
 
 const hostKey = new URLSearchParams(location.search).get("k") || "";
@@ -112,6 +165,7 @@ async function boot() {
   renderLinks();
   connect();
   loadMicDevices();
+  checkUpdate();
   setInterval(tickStats, 1000);
   setInterval(tickClock, 500);
 }

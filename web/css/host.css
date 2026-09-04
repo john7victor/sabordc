@@ -195,6 +195,22 @@
 .scope.pending { border-style: dashed; }
 .scope.pending svg { animation: pulse 1.6s ease-in-out infinite; }
 
+/* ------------------------------------------------- aviso de versão nova - */
+.updatecard {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--r);
+  background: var(--accent-soft);
+  border: 1px solid rgba(255, 122, 69, .42);
+  flex: none;
+}
+.update-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.update-text b { font-size: 12.5px; color: var(--accent); }
+.update-text span { font-size: 11px; color: var(--txt-dim); }
+.updatecard .btn { height: 28px; padding: 0 12px; font-size: 12px; flex: none; }
+.updatecard .icon-btn { width: 26px; height: 26px; border-color: transparent; background: transparent; }
+.updatecard .icon-btn svg { width: 13px; height: 13px; }
+
 .watch-link {
   margin-top: 9px;
   justify-content: center;

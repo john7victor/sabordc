@@ -88,6 +88,22 @@ a sua transmissão (se tiver uma rolando) e desconecta quem estiver na sua
 sala — o app avisa antes. Pra voltar, é só clicar em **"← Meu painel"** no
 canto da sala.
 
+### Atualização
+
+Ao abrir o painel, o app pergunta ao GitHub qual é a última versão publicada
+em [`john7victor/sabordc`](https://github.com/john7victor/sabordc/releases) e
+compara com a que está rodando. Se tiver uma mais nova, aparece um aviso na
+barra lateral com um botão que leva pro download — ele **não** troca de versão
+sozinho, justamente pra não puxar o tapete no meio de uma transmissão.
+
+O repositório é público de propósito: assim a consulta funciona sem token
+nenhum. Num repositório privado, o app precisaria carregar um segredo embutido
+pra conseguir perguntar — e qualquer pessoa extrai isso de um `.exe`.
+
+Sem internet, com o GitHub fora do ar ou sem release publicada, a checagem
+falha em silêncio: não é assunto que justifique atrapalhar quem só quer
+transmitir.
+
 ### Amigos em outra cidade (o caso normal)
 
 1. **Abra o link público** — vem ligado por padrão, em *Ajustes → Rede*. Espere
@@ -404,8 +420,12 @@ Setup. Saem duas coisas em `dist\`:
 
 | Saída | O que é |
 | --- | --- |
-| `SABOR-1.0.0-setup.exe` | Instalador (~15 MB) — atalhos, firewall, desinstalador |
-| `SABOR\` | Versão portátil — copia a pasta e roda o `SABOR.exe` |
+| `Sabor DC-<versão>-setup.exe` | Instalador (~87 MB) — atalhos, firewall, desinstalador, e o .NET Desktop Runtime embutido |
+| `SABOR\` (em `%LOCALAPPDATA%\SABOR-build\dist`) | Versão portátil — copia a pasta e roda o `SABOR.exe` |
+
+A versão sai de três lugares que precisam concordar: `sabor/__init__.py`
+(`__version__`, é o que o app compara com o GitHub), `installer/sabor.iss`
+(`AppVersion`) e `installer/version_info.txt` (as propriedades do `.exe`).
 
 Precisa das ferramentas de build uma vez:
 

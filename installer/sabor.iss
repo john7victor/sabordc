@@ -2,7 +2,7 @@
 ; Compile com:  ISCC.exe installer\sabor.iss   (ou use build.bat)
 
 #define AppName      "Sabor DC"
-#define AppVersion   "1.0.0"
+#define AppVersion   "1.1.0"
 #define AppExe       "SABOR.exe"
 #define AppPublisher "Sabor DC"
 ; O build.bat copia o cloudflared para ca quando encontra um. Se nao houver,

@@ -127,6 +127,18 @@ class Api:
         webbrowser.open(url)
         return True
 
+    def open_url(self, url: str) -> bool:
+        """Abre um link no navegador padrao — usado pelo aviso de versao nova.
+
+        So https, e so o dominio das releases: este metodo fica exposto ao
+        JavaScript da pagina, entao aceitar qualquer coisa aqui seria dar ao
+        painel um jeito de abrir qualquer programa via protocolo estranho.
+        """
+        if not isinstance(url, str) or not url.startswith("https://github.com/"):
+            return False
+        webbrowser.open(url)
+        return True
+
     def minimize(self) -> None:
         if self._window:
             self._window.minimize()
