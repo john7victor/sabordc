@@ -1,0 +1,374 @@
+/* Sabor DC — sistema visual compartilhado entre o painel do host e a sala */
+
+:root {
+  --bg: #0b0b0f;
+  --bg-soft: #101017;
+  --panel: #15151e;
+  --panel-2: #1b1b26;
+  --panel-3: #23232f;
+  --line: #262633;
+  --line-soft: #1e1e29;
+  --txt: #ededf2;
+  --txt-dim: #a6a6b8;
+  --muted: #74748a;
+
+  --accent: #ff7a45;
+  --accent-2: #ff3d71;
+  --accent-soft: rgba(255, 122, 69, 0.14);
+  --grad: linear-gradient(135deg, #ff8a3d 0%, #ff4d6d 100%);
+
+  --live: #ff4757;
+  --ok: #3ddc97;
+  --warn: #ffc542;
+
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 18px;
+  --shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  --ring: 0 0 0 1px var(--line);
+
+  --font: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, -apple-system,
+    "Helvetica Neue", Arial, sans-serif;
+  --mono: "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Qualquer regra de `display` nossa venceria o atributo `hidden` do navegador,
+   e elementos escondidos apareceriam. Este bloco vem antes de tudo. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+body.scrollable { overflow: auto; }
+
+::selection { background: var(--accent-soft); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #2a2a38;
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a3a4c; background-clip: content-box; }
+
+/* ---------------------------------------------------------------- tipos -- */
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+h1 { font-size: 20px; }
+h2 { font-size: 15px; }
+h3 { font-size: 13px; }
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dim { color: var(--txt-dim); }
+.mono { font-family: var(--mono); font-size: 12px; }
+
+/* -------------------------------------------------------------- marca --- */
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand-mark {
+  width: 22px; height: 22px;
+  border-radius: 7px;
+  background: var(--grad);
+  display: grid; place-items: center;
+  box-shadow: 0 4px 14px -4px rgba(255, 77, 109, 0.7);
+  flex: none;
+}
+.brand-mark svg { width: 13px; height: 13px; }
+.brand-name {
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  font-size: 12.5px;
+}
+
+/* ------------------------------------------------------------- botões --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--txt);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .14s, border-color .14s, transform .1s, opacity .14s;
+  user-select: none;
+}
+.btn:hover:not(:disabled) { background: var(--panel-3); border-color: #34344a; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+.btn svg { width: 15px; height: 15px; flex: none; }
+
+.btn-primary {
+  background: var(--grad);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 22px -10px rgba(255, 77, 109, .9);
+}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.07); background: var(--grad); }
+
+.btn-danger { background: rgba(255, 71, 87, .12); border-color: rgba(255, 71, 87, .35); color: #ff8b95; }
+.btn-danger:hover:not(:disabled) { background: rgba(255, 71, 87, .2); border-color: rgba(255, 71, 87, .5); }
+
+.btn-ghost { background: transparent; border-color: transparent; color: var(--txt-dim); }
+.btn-ghost:hover:not(:disabled) { background: var(--panel-2); color: var(--txt); }
+
+.btn-lg { height: 44px; padding: 0 22px; font-size: 14px; border-radius: var(--r); }
+.btn-block { width: 100%; }
+
+.icon-btn {
+  width: 34px; height: 34px;
+  padding: 0;
+  display: grid; place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--txt-dim);
+  cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.icon-btn:hover { background: var(--panel-3); color: var(--txt); }
+.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn.active { background: var(--accent-soft); border-color: rgba(255,122,69,.4); color: var(--accent); }
+.icon-btn.danger { background: rgba(255,71,87,.14); border-color: rgba(255,71,87,.34); color: #ff8b95; }
+
+/* ------------------------------------------------------------ campos ---- */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-size: 12px; font-weight: 550; color: var(--txt-dim); }
+.field .hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-soft);
+  color: var(--txt);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .14s, box-shadow .14s;
+  width: 100%;
+}
+select { padding-right: 6px; cursor: pointer; }
+textarea { height: auto; padding: 9px 10px; resize: vertical; line-height: 1.5; }
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(255, 122, 69, .55);
+  box-shadow: 0 0 0 3px rgba(255, 122, 69, .1);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--panel-3);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255, 122, 69, .18);
+}
+
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { display: none; }
+.switch .track {
+  width: 36px; height: 20px;
+  border-radius: 99px;
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  position: relative;
+  transition: background .16s, border-color .16s;
+  flex: none;
+}
+.switch .track::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .16s, background .16s;
+}
+.switch input:checked + .track { background: var(--accent-soft); border-color: rgba(255,122,69,.5); }
+.switch input:checked + .track::after { transform: translateX(16px); background: var(--accent); }
+.switch .label { font-size: 12.5px; color: var(--txt-dim); }
+
+/* ------------------------------------------------------------- cartões -- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  padding: 14px;
+}
+.card-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 9px;
+  border-radius: 99px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 11px; font-weight: 600;
+  color: var(--txt-dim);
+}
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.pill.live { background: rgba(255,71,87,.13); border-color: rgba(255,71,87,.35); color: #ff8b95; }
+.pill.live .dot { background: var(--live); animation: pulse 1.8s ease-in-out infinite; }
+.pill.ok { background: rgba(61,220,151,.1); border-color: rgba(61,220,151,.3); color: var(--ok); }
+.pill.ok .dot { background: var(--ok); }
+
+.pill-btn {
+  font: inherit; cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.pill-btn:hover { background: var(--panel-3); color: var(--txt); border-color: #34344a; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,71,87,.6); }
+  50% { opacity: .65; box-shadow: 0 0 0 5px rgba(255,71,87,0); }
+}
+
+/* -------------------------------------------------------------- avatar -- */
+.avatar {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700;
+  color: #fff;
+  flex: none;
+  position: relative;
+}
+.avatar.speaking { box-shadow: 0 0 0 2px var(--ok), 0 0 12px -2px var(--ok); }
+
+/* pontinho ao lado do nome de quem está transmitindo agora */
+.live-dot {
+  display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+  border-radius: 50%; background: var(--live);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- toast - */
+#toasts {
+  position: fixed; bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 900; pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 15px;
+  border-radius: 99px;
+  background: rgba(28, 28, 39, .96);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  animation: toast-in .22s cubic-bezier(.2,.9,.3,1.2);
+  backdrop-filter: blur(12px);
+}
+.toast.err { border-color: rgba(255,71,87,.45); color: #ff9ba2; }
+.toast.ok { border-color: rgba(61,220,151,.4); color: var(--ok); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+
+/* ---------------------------------------------------------------- chat -- */
+.chat-log { display: flex; flex-direction: column; gap: 11px; padding: 4px 2px; }
+.msg { display: flex; gap: 9px; }
+.msg .body { min-width: 0; }
+.msg .who { font-size: 12px; font-weight: 650; }
+.msg .time { font-size: 10.5px; color: var(--muted); margin-left: 6px; font-weight: 400; }
+.msg .text { font-size: 13px; color: var(--txt-dim); word-wrap: break-word; overflow-wrap: anywhere; }
+.msg.sys { justify-content: center; }
+.msg.sys .text { font-size: 11.5px; color: var(--muted); font-style: italic; }
+
+.chat-form { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+
+/* --------------------------------------------------------------- vazio -- */
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 32px 18px; text-align: center; color: var(--muted);
+}
+.empty svg { width: 26px; height: 26px; opacity: .5; }
+.empty p { font-size: 12.5px; max-width: 26ch; line-height: 1.5; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ------------------------------------------------------- grade de vídeo -- */
+/* Um card por transmissão ao vivo na sala — o host e qualquer convidado que
+   também ligar a tela aparecem lado a lado aqui, os dois na mesma sala, sem
+   trocar de link. Compartilhado entre o painel do host e a sala do convidado. */
+.vgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+.vgrid:empty { display: none; }
+
+/* Um card em foco: ele cresce e ocupa o espaço todo, os outros encolhem numa
+   faixa embaixo — sem sair da grade e sem precisar arrastar nada. */
+.vgrid.has-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.vgrid.has-focus .vtile { flex: 0 0 96px; }
+.vgrid.has-focus .vtile.focus { flex: 1 1 auto; min-height: 0; order: -1; }
+
+.vtile {
+  position: relative;
+  min-height: 0;
+  border-radius: var(--r);
+  border: 1px solid var(--line-soft);
+  background: #000;
+  overflow: hidden;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.vtile video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.vtile-tag {
+  position: absolute; left: 8px; bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(8, 8, 12, .74);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  font-size: 11px; font-weight: 600; color: var(--txt-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.vtile-tag:empty { display: none; }

@@ -1,0 +1,10 @@
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+installer/sabor.ico
+installer/sabor.png
+installer/cloudflared.exe
+installer/windowsdesktop-runtime-win-x64.exe
+.claude/

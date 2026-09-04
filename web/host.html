@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sabor DC — Painel</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="stylesheet" href="/static/css/host.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="titlebar pywebview-drag-region">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2s4 4.2 4 8a4 4 0 0 1-8 0c0-1.2.4-2.2 1-3-2.6 1.6-5 4.4-5 8a8 8 0 1 0 16 0c0-5.5-5-9.8-8-13Z"/>
+        </svg>
+      </span>
+      <span class="brand-name">Sabor DC</span>
+    </div>
+
+    <div class="titlebar-mid">
+      <span class="pill" id="conn-pill"><span class="dot"></span><span id="conn-text">conectando…</span></span>
+      <span class="pill live" id="live-pill" hidden><span class="dot"></span>AO VIVO <span id="live-time" class="mono"></span></span>
+    </div>
+
+    <div class="win-ctl" id="win-ctl" hidden>
+      <button class="win-btn" data-win="min" title="Minimizar" aria-label="Minimizar"></button>
+      <button class="win-btn" data-win="max" title="Maximizar" aria-label="Maximizar"></button>
+      <button class="win-btn close" data-win="close" title="Fechar" aria-label="Fechar"></button>
+    </div>
+  </header>
+
+  <main class="workspace">
+
+    <!-- ------------------------------------------------------ palco -- -->
+    <section class="stage">
+
+      <div class="preview" id="preview">
+        <div class="vgrid" id="grid"></div>
+
+        <div class="preview-empty" id="preview-empty">
+          <div class="preview-glow"></div>
+          <h1>Sua tela, sua sala</h1>
+          <p>Escolha uma janela, um jogo ou a tela inteira. Seu PC vira o
+             servidor e você só manda o link.</p>
+          <button class="btn btn-primary btn-lg" id="go-live-hero">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v11H3zM8 20h8M12 16v4"/></svg>
+            Começar transmissão
+          </button>
+          <span class="hint-sm" id="capture-hint"></span>
+        </div>
+
+        <div class="preview-badge" id="preview-badge" hidden>
+          <span class="mono" id="badge-res">—</span>
+          <span class="sep"></span>
+          <span class="mono" id="badge-fps">— fps</span>
+          <span class="sep"></span>
+          <span class="mono" id="badge-codec" hidden></span>
+        </div>
+      </div>
+
+      <div class="statbar">
+        <div class="stat"><span class="eyebrow">Espectadores</span><strong id="s-viewers">0</strong></div>
+        <div class="stat"><span class="eyebrow">Envio total</span><strong id="s-bitrate">—</strong></div>
+        <div class="stat"><span class="eyebrow">Latência</span><strong id="s-rtt">—</strong></div>
+        <div class="stat"><span class="eyebrow">Perda</span><strong id="s-loss">—</strong></div>
+        <div class="stat"><span class="eyebrow">No ar há</span><strong id="s-uptime" class="mono">00:00</strong></div>
+      </div>
+
+      <div class="dock">
+        <button class="icon-btn" id="btn-mic" title="Microfone (Ctrl+M)"></button>
+        <div class="mic-meter"><span id="mic-level"></span></div>
+
+        <div class="dock-sep"></div>
+
+        <button class="btn btn-primary" id="btn-live">
+          <span id="btn-live-label">Transmitir</span>
+        </button>
+        <button class="btn" id="btn-source" disabled>Trocar fonte</button>
+
+        <div class="dock-sep"></div>
+
+        <button class="icon-btn" id="btn-preview" title="Desligar a prévia (economiza GPU enquanto joga)"></button>
+        <button class="icon-btn" id="btn-audio-share" title="Enviar áudio do sistema"></button>
+        <button class="icon-btn" id="btn-settings" title="Ajustes"></button>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------- barra lateral -->
+    <aside class="sidebar">
+
+      <div class="linkcard">
+        <div class="card-hd">
+          <span class="eyebrow">Link da sala</span>
+          <button class="btn-ghost btn linkmode" id="btn-rotate" title="Gerar um link novo e derrubar o antigo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-.6 4M20 5v6h-6"/></svg>
+          </button>
+        </div>
+
+        <div class="linkbox">
+          <input type="text" id="link-value" readonly spellcheck="false">
+          <button class="btn btn-primary" id="btn-copy">Copiar</button>
+        </div>
+
+        <div class="linkscope" id="linkscope"></div>
+
+        <button class="btn-ghost btn btn-block watch-link" id="btn-watch-open" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+          Assistir uma transmissão
+        </button>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="people" role="tab">Pessoas <span class="badge" id="tab-count">0</span></button>
+        <button class="tab" data-tab="chat" role="tab">Chat <span class="badge dotbadge" id="chat-badge" hidden></span></button>
+        <button class="tab" data-tab="settings" role="tab">Ajustes</button>
+      </nav>
+
+      <div class="panels">
+
+        <div class="panel active" data-panel="people">
+          <div class="panel-scroll" id="people-list"></div>
+          <div class="panel-foot">
+            <button class="btn btn-block" id="btn-mute-all">Silenciar todos</button>
+            <label class="switch" style="margin-top:10px">
+              <input type="checkbox" id="lock-room">
+              <span class="track"></span>
+              <span class="label">Trancar a sala (ninguém novo entra)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel" data-panel="chat">
+          <div class="panel-scroll chat-log" id="chat-log"></div>
+          <form class="chat-form" id="chat-form">
+            <input type="text" id="chat-input" placeholder="Mandar mensagem…" maxlength="500" autocomplete="off">
+            <button class="icon-btn" type="submit" aria-label="Enviar"></button>
+          </form>
+        </div>
+
+        <div class="panel" data-panel="settings">
+          <div class="panel-scroll settings">
+
+            <section class="group">
+              <span class="eyebrow">Identidade</span>
+              <div class="field">
+                <label for="set-name">Seu nome</label>
+                <input type="text" id="set-name" maxlength="24">
+              </div>
+              <div class="field">
+                <label for="set-room">Nome da sala</label>
+                <input type="text" id="set-room" maxlength="40">
+              </div>
+            </section>
+
+            <section class="group">
+              <span class="eyebrow">Qualidade</span>
+              <div class="row2">
+                <div class="field">
+                  <label for="set-res">Resolução</label>
+                  <select id="set-res">
+                    <option value="720p">720p</option>
+                    <option value="1080p">1080p</option>
+                    <option value="1440p">1440p</option>
+                    <option value="nativa">Nativa</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="set-fps">Taxa</label>
+                  <select id="set-fps">
+                    <option value="30">30 fps</option>
+                    <option value="60">60 fps</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="set-bitrate">Teto de banda <b id="bitrate-out" class="mono"></b> por espectador</label>
+                <input type="range" id="set-bitrate" min="1000" max="20000" step="500">
+                <span class="hint" id="bitrate-hint"></span>
+              </div>
+            </section>
+
+            <section class="group">
+              <span class="eyebrow">Microfone</span>
+              <div class="field">
+                <label for="set-mic">Dispositivo de entrada</label>
+                <select id="set-mic"></select>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="set-talk" checked>
+                <span class="track"></span>
+                <span class="label">Convidados podem falar</span>
+              </label>
+            </section>
+
+            <section class="group">
+              <span class="eyebrow">Rede</span>
+              <div class="netrow" id="net-lan"></div>
+              <div class="field">
+                <label>Link público</label>
+                <span class="hint">Sem túnel, o link só funciona na sua rede local.
+                  O <code>cloudflared</code> publica este mesmo servidor na internet.</span>
+                <button class="btn btn-block" id="btn-tunnel">Abrir link público</button>
+                <span class="hint" id="tunnel-status"></span>
+              </div>
+
+              <label class="switch">
+                <input type="checkbox" id="set-autotunnel">
+                <span class="track"></span>
+                <span class="label">Abrir o link público sozinho ao iniciar</span>
+              </label>
+              <div class="field">
+                <label>Diagnóstico</label>
+                <span class="hint">Descobre se os seus amigos vão conseguir
+                  conexão direta com você, antes de você convidar alguém.</span>
+                <button class="btn btn-block" id="btn-nettest">Testar minha rede</button>
+                <div class="nettest" id="nettest" hidden></div>
+              </div>
+
+              <details class="adv">
+                <summary>Servidor TURN (obrigatório sob CGNAT)</summary>
+                <span class="hint">Se a sua internet é fibra com CGNAT — ou se o
+                  diagnóstico acima disser <b>NAT simétrico</b> — nenhuma conexão
+                  direta fecha e o TURN deixa de ser opcional. Uma URL por linha:
+                  a de UDP é o caminho rápido, a <code>turns:…:443?transport=tcp</code>
+                  é a que passa em rede que bloqueia UDP.</span>
+                <div class="field"><label for="turn-provider">De onde vem o TURN</label>
+                  <select id="turn-provider">
+                    <option value="cloudflare">Cloudflare Realtime (credencial temporária)</option>
+                    <option value="manual">Servidor próprio (coturn ou outro)</option>
+                  </select></div>
+
+                <div id="turn-cf">
+                  <span class="hint">No painel da Cloudflare: <b>Realtime → TURN →
+                    Create</b>. Copie o <i>Turn Token ID</i> e a chave. Os dois ficam
+                    só neste PC: o que vai no link é uma credencial derivada, que
+                    expira sozinha.</span>
+                  <div class="field"><label for="cf-key">Turn Token ID</label>
+                    <input type="text" id="cf-key" spellcheck="false"></div>
+                  <div class="field"><label for="cf-token">API Token</label>
+                    <input type="password" id="cf-token" spellcheck="false"></div>
+                </div>
+
+                <div id="turn-manual">
+                <div class="field"><label for="turn-urls">URLs</label>
+                  <textarea id="turn-urls" rows="3" spellcheck="false"
+                    placeholder="turn:seu-servidor:3478?transport=udp&#10;turns:seu-servidor:443?transport=tcp"></textarea></div>
+                <div class="field"><label for="turn-secret">Segredo compartilhado (coturn <code>use-auth-secret</code>)</label>
+                  <input type="password" id="turn-secret" spellcheck="false">
+                  <span class="hint">Recomendado. Com ele cada convidado recebe uma
+                    senha que expira em 1 h. Sem ele, a senha fixa do seu relay vai
+                    junto com o link para todo mundo que entrar na sala.</span></div>
+                <div class="row2">
+                  <div class="field"><label for="turn-user">Usuário fixo</label><input type="text" id="turn-user" spellcheck="false"></div>
+                  <div class="field"><label for="turn-pass">Senha fixa</label><input type="password" id="turn-pass"></div>
+                </div>
+                </div>
+
+                <label class="switch">
+                  <input type="checkbox" id="set-forcerelay">
+                  <span class="track"></span>
+                  <span class="label">Ir direto pelo TURN (pula a tentativa direta)</span>
+                </label>
+                <button class="btn btn-block" id="btn-save-turn">Salvar TURN</button>
+                <button class="btn btn-block" id="btn-test-turn">Testar o TURN agora</button>
+                <span class="hint" id="turn-status"></span>
+              </details>
+            </section>
+
+            <section class="group">
+              <button class="btn btn-block" id="btn-open-browser">Abrir painel no navegador</button>
+              <span class="hint">Use se a janela do app não conseguir abrir o seletor de tela.</span>
+            </section>
+
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="modal-overlay" id="watch-modal" hidden>
+  <div class="modal-card">
+    <h2>Assistir uma transmissão</h2>
+    <p>Cole o link que alguém te mandou — de outra sala do Sabor DC, sua ou de
+       outra pessoa.</p>
+    <div class="field">
+      <input type="text" id="watch-link-input" placeholder="https://…" spellcheck="false" autocomplete="off">
+    </div>
+    <span class="hint warn" id="watch-link-warn" hidden></span>
+    <div class="modal-acts">
+      <button class="btn" id="watch-cancel" type="button">Cancelar</button>
+      <button class="btn btn-primary" id="watch-go" type="button">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/static/js/host.js"></script>
+</body>
+</html>

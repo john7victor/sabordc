@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<title>Sabor DC</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="stylesheet" href="/static/css/join.css">
+</head>
+<body>
+
+<!-- ============================================================ portão -->
+<div class="gate" id="gate">
+  <div class="gate-glow"></div>
+
+  <div class="gate-card">
+    <div class="brand" style="justify-content:center">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2s4 4.2 4 8a4 4 0 0 1-8 0c0-1.2.4-2.2 1-3-2.6 1.6-5 4.4-5 8a8 8 0 1 0 16 0c0-5.5-5-9.8-8-13Z"/>
+        </svg>
+      </span>
+      <span class="brand-name">Sabor DC</span>
+    </div>
+
+    <h1 id="gate-room">Sala</h1>
+    <p class="gate-sub" id="gate-sub">Você foi convidado para assistir e conversar.</p>
+
+    <form id="gate-form">
+      <div class="field">
+        <label for="gate-name">Como quer aparecer?</label>
+        <input type="text" id="gate-name" maxlength="24" placeholder="Seu nome" autocomplete="nickname" required>
+      </div>
+
+      <button type="button" class="mic-pick" id="gate-mic">
+        <span class="mic-pick-icon" id="gate-mic-icon"></span>
+        <span class="mic-pick-text">
+          <b id="gate-mic-title">Entrar com microfone</b>
+          <small id="gate-mic-sub">Toque para liberar e testar</small>
+        </span>
+        <span class="mic-meter"><span id="gate-level"></span></span>
+      </button>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block">Entrar na sala</button>
+      <span class="gate-note" id="gate-note"></span>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================== sala -->
+<div class="room" id="room" hidden>
+
+  <div class="video-wrap" id="video-wrap">
+    <div class="vgrid" id="grid"></div>
+
+    <div class="waiting" id="waiting">
+      <div class="spinner"></div>
+      <h2 id="waiting-title">Conectando…</h2>
+      <p id="waiting-sub">Estabelecendo a conexão direta com o host.</p>
+    </div>
+
+    <div class="topbar" id="topbar">
+      <div class="topbar-left">
+        <span class="pill live" id="live-pill" hidden><span class="dot"></span>AO VIVO</span>
+        <span class="room-name" id="room-name"></span>
+      </div>
+      <div class="topbar-right">
+        <button class="pill pill-btn" id="btn-home" hidden title="Voltar ao seu painel">← Meu painel</button>
+        <span class="pill" id="net-pill"><span class="dot"></span><span id="net-text">—</span></span>
+      </div>
+    </div>
+
+    <div class="dock" id="dock">
+      <div class="slider-pop">
+        <button class="icon-btn" id="btn-share" title="Transmitir sua tela (S)"></button>
+        <div class="pop pop-stack">
+          <label>Resolução da sua transmissão
+            <select id="share-res">
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+              <option value="1440p">1440p</option>
+              <option value="nativa">Nativa</option>
+            </select>
+          </label>
+          <label>Taxa
+            <select id="share-fps">
+              <option value="30">30 fps</option>
+              <option value="60">60 fps</option>
+            </select>
+          </label>
+          <span class="hint" id="share-hint"></span>
+        </div>
+      </div>
+      <button class="icon-btn" id="btn-mic" title="Microfone (M)"></button>
+
+      <div class="slider-pop">
+        <button class="icon-btn" id="btn-volume" title="Volume"></button>
+        <div class="pop">
+          <label>Jogo <input type="range" id="vol-game" min="0" max="100" value="100"></label>
+          <label>Vozes <input type="range" id="vol-voice" min="0" max="100" value="100"></label>
+        </div>
+      </div>
+
+      <div class="dock-sep"></div>
+      <button class="icon-btn" id="btn-people" title="Pessoas"><span class="count" id="people-count">0</span></button>
+      <button class="icon-btn" id="btn-chat" title="Chat"><span class="dotbadge" id="chat-dot" hidden></span></button>
+      <button class="icon-btn" id="btn-full" title="Tela cheia (F)"></button>
+      <div class="dock-sep"></div>
+      <button class="icon-btn danger" id="btn-leave" title="Sair"></button>
+    </div>
+
+    <div class="speakers" id="speakers"></div>
+  </div>
+
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-hd">
+      <div class="tabs">
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="people">Pessoas</button>
+      </div>
+      <button class="icon-btn" id="drawer-close" aria-label="Fechar"></button>
+    </div>
+
+    <div class="panel active" data-panel="chat">
+      <div class="panel-scroll chat-log" id="chat-log"></div>
+      <form class="chat-form" id="chat-form">
+        <input type="text" id="chat-input" placeholder="Mandar mensagem…" maxlength="500" autocomplete="off">
+        <button class="icon-btn" type="submit" aria-label="Enviar"></button>
+      </form>
+    </div>
+
+    <div class="panel" data-panel="people">
+      <div class="panel-scroll" id="people-list"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- =========================================================== barrado -->
+<div class="blocked" id="blocked" hidden>
+  <div class="blocked-card">
+    <span class="blocked-icon"></span>
+    <h1 id="blocked-title">Sala indisponível</h1>
+    <p id="blocked-sub"></p>
+    <button class="btn" id="blocked-retry">Tentar de novo</button>
+    <button class="btn btn-primary" id="blocked-home" hidden>Voltar ao meu painel</button>
+  </div>
+</div>
+
+<div id="voices" hidden></div>
+
+<script type="module" src="/static/js/join.js"></script>
+</body>
+</html>
