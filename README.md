@@ -24,11 +24,19 @@ sai da sua GPU direto para cada convidado por WebRTC, com o **encoder de
 hardware do próprio navegador** — é por isso que dá para transmitir jogando sem
 perder FPS.
 
-Topologia em estrela: cada convidado tem **uma** conexão, com você. A voz — e,
-se algum convidado ligar a própria transmissão, a tela dele também — chega até
-você e você retransmite para os outros. Seu PC é o servidor pra tudo: vídeo e
-áudio de todo mundo passam por ele, mesmo quando quem está transmitindo é um
-convidado.
+Topologia em estrela para a voz: cada convidado tem **uma** conexão com você, a
+voz de todo mundo passa por aí e você retransmite para os outros.
+
+**Tela de convidado não passa por você.** Quando um convidado liga a própria
+transmissão, quem quiser assistir abre uma conexão direta com ele — sem o seu
+PC no meio re-codificando a imagem pra cada espectador. O repasse pelo host
+continua existindo como reserva: a conexão direta só toma o lugar dele depois
+de fechar de verdade, e se cair, o repasse volta sozinho sem ninguém ver tela
+preta.
+
+A troca é essa: quem transmite manda uma cópia pra cada espectador, em vez de
+uma só pro host. Vale a pena porque o host é quem está jogando — e agora quem
+transmite paga o próprio custo, não a máquina de outra pessoa.
 
 | Peça | O que faz |
 | --- | --- |
@@ -39,6 +47,8 @@ convidado.
 | `web/host.html` | Painel de quem hospeda a sala |
 | `web/join.html` | Sala de quem assiste (e pode transmitir também) |
 | `web/js/grid.js` | Grade de vídeo: um card por transmissão ao vivo |
+| `web/js/mesh.js` | Conexão direta entre convidados (tela de quem não é o host) |
+| `web/js/voz.js` | Efeitos de voz — o microfone passa por aqui antes de sair |
 
 ---
 
@@ -116,6 +126,17 @@ primeira sala.
 Quem está transmitindo continua transmitindo ao mudar de sala; o que muda é
 quem recebe. Passando o mouse numa pessoa aparece um seletor pra mover ela
 sozinha, sem sortear todo mundo.
+
+### Efeitos de voz
+
+No painel, em **Ajustes → Efeito na sua voz**; na sala do convidado, na
+varinha ao lado do microfone. São oito: grave, monstro, agudo, esquilo, robô,
+rádio velho, caverna — e *sem efeito*, que é o padrão.
+
+Muda só o que os outros ouvem. A troca vale na hora, sem reconectar nada: o
+microfone passa por uma cadeia do Web Audio antes de virar a faixa que sai pela
+conexão, e é essa faixa (sempre a mesma) que está negociada com todo mundo. A
+escolha fica salva no navegador pra próxima vez.
 
 ### Atualização
 
@@ -358,12 +379,18 @@ O que o selo diz:
 | `· CPU no limite` | A codificação não acompanha. Baixe resolução ou taxa. |
 | `· banda no limite` | Seu upload não dá conta. Baixe o teto de banda. |
 
+**Tela de convidado não pesa no seu PC.** Se um amigo transmitir junto com
+você, a imagem dele vai direto dele pra quem assiste — sua máquina não
+re-codifica a tela de mais ninguém. Você recebe uma cópia só pra ver, como
+qualquer outro espectador.
+
 **Ainda engasga?** Nesta ordem:
 
 1. **Deixe a prévia desligada** (o ícone de olho na barra de baixo). Ela
    desenha a captura dentro da janela do app, disputando GPU com o jogo — por
    isso vem desligada por padrão, e o diálogo de qualidade pergunta antes de
-   cada transmissão. Não afeta nada do que os espectadores veem.
+   cada transmissão. Dá pra ligar e desligar a qualquer momento, inclusive no
+   meio da transmissão; não afeta nada do que os espectadores veem.
 2. Baixe para **1080p30** — metade do trabalho de codificação.
 3. Baixe para **720p60** se você prefere fluidez a nitidez.
 4. Rode o jogo em **janela sem bordas** em vez de tela cheia exclusiva: em tela

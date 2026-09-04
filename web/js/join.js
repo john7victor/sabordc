@@ -5,6 +5,8 @@ import { $, $$, el, icon, toast, avatarFor, fmtClock, createVoiceMeter } from ".
 import { Signal } from "./signal.js";
 import { Peer, MIC_CONSTRAINTS, displayConstraints, preferVideoCodecs, trackRouter } from "./rtc.js";
 import { Grid } from "./grid.js";
+import { Voz, EFEITOS } from "./voz.js";
+import { Mesh } from "./mesh.js";
 
 // Qualidade de quando UM CONVIDADO transmite. Fica salva no navegador dele
 // (não precisa reconfigurar toda vez) — o padrão é conservador de propósito,
@@ -26,7 +28,9 @@ const state = {
   me: null,
   hostId: null,
   peer: null,
-  mic: null,
+  mic: null,        // o que sai pra rede (já com efeito)
+  micRaw: null,     // o microfone cru
+  voz: null,        // a cadeia de efeitos entre um e outro
   micOn: false,
   micSent: false,
   gateMeter: null,
@@ -38,6 +42,11 @@ const state = {
   ownScreen: null,      // MediaStream da NOSSA própria transmissão, se ligada
   ownScreenTx: [],
   screenSent: false,
+  // Malha direta entre convidados: a tela de quem NÃO é o host vem direto de
+  // quem transmite, sem passar pelo PC dele. Ver mesh.js.
+  mesh: null,
+  direto: new Set(),    // ids cuja tela já está vindo pela malha
+  hostRouter: null,     // pra reprocessar o que o host manda quando a malha cai
   volGame: 1,
   volVoice: 1,
   idleTimer: null,
@@ -126,8 +135,7 @@ function wireGate() {
 
 async function armMic() {
   if (state.mic) {
-    state.mic.getTracks().forEach((t) => t.stop());
-    state.mic = null;
+    pararMic();
     state.gateMeter?.stop();
     state.gateMeter = null;
     $("#gate-mic").classList.remove("on");
@@ -146,12 +154,15 @@ async function armMic() {
   }
 
   try {
-    state.mic = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    state.micRaw = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    state.mic = montarVoz(state.micRaw);
     $("#gate-mic").classList.add("on");
     $("#gate-mic-icon").replaceChildren(icon("mic"));
     $("#gate-mic-title").textContent = "Microfone liberado";
     $("#gate-mic-sub").textContent = "Fale para ver o medidor mexer";
-    state.gateMeter = createVoiceMeter(state.mic, (lvl) => {
+    // O medidor escuta o microfone cru: mostra que você está falando mesmo
+    // que o efeito escolhido mexa muito no volume da voz.
+    state.gateMeter = createVoiceMeter(state.micRaw, (lvl) => {
       $("#gate-level").style.width = `${Math.round(lvl * 100)}%`;
     });
   } catch {
@@ -185,9 +196,11 @@ function connect(name) {
     for (const l of m.room.live || []) state.live.set(l.id, l.startedAt);
     const host = m.room.peers.find((p) => p.role === "host");
     if (host) openHost(host.id);
+    abrirMalha();
     (m.chat || []).forEach(addChat);
     updateWaitingState();
     renderPeople();
+    revisarMalha();
   });
 
   // Alguem (host ou outro convidado) comecou ou parou de transmitir. O card
@@ -199,9 +212,11 @@ function connect(name) {
     else {
       state.live.delete(m.id);
       if (m.id !== state.me?.id) state.grid.remove(m.id);
+      state.mesh?.parar(m.id);
     }
     updateWaitingState();
     renderPeople();
+    revisarMalha();
   });
 
   sig.on("peer-join", (m) => {
@@ -217,6 +232,7 @@ function connect(name) {
     state.people.delete(m.id);
     dropVoice(m.id);
     state.live.delete(m.id);
+    state.mesh?.esquecer(m.id);
     state.grid.remove(m.id); // por garantia — o "live:false" já deveria ter tirado o card
     if (m.id === state.hostId) {
       state.hostId = null;
@@ -247,6 +263,7 @@ function connect(name) {
     // no último quadro, se ninguém o tirasse.
     limparGradeForaDaSala();
     renderPeople();
+    revisarMalha();
   });
   sig.on("state", (m) => {
     const p = state.people.get(m.id);
@@ -254,6 +271,13 @@ function connect(name) {
   });
 
   sig.on("signal", (m) => {
+    // Sinal da malha (convidado <-> convidado). Vem marcado com o id de quem
+    // transmite naquela ligação, que é o que distingue duas conexões entre o
+    // mesmo par de pessoas.
+    if (m.payload?.mesh) {
+      state.mesh?.aceitar(m.from, m.payload.mesh, m.payload);
+      return;
+    }
     if (m.from !== state.hostId) return;
     // O host desistiu da rota direta e vai refazer tudo pelo TURN. Precisamos
     // jogar fora a conexão atual: aplicar a oferta nova numa RTCPeerConnection
@@ -310,6 +334,75 @@ function updateWaitingState() {
   showWaiting("Ninguém transmitindo agora", "Assim que alguém começar, aparece aqui.");
 }
 
+/* ============================================== malha entre convidados == */
+
+/** A sala de uma pessoa, com o padrão de quem ainda não trocou de sala. */
+function salaDe(p) {
+  return p?.sala || state.salas[0]?.id || null;
+}
+
+function naMinhaSala(id) {
+  if (!state.salas.length) return true;      // sala única: todo mundo junto
+  const p = state.people.get(id);
+  return !p || salaDe(p) === salaDe(state.me);
+}
+
+function abrirMalha() {
+  if (state.mesh || !state.me) return;
+  state.mesh = new Mesh({
+    meuId: state.me.id,
+    iceServers: state.boot.ice,
+    relayOnly: !!state.boot.forceRelay,
+    enviar: (to, payload) => state.signal?.signal(to, payload),
+    onTela: (ownerId, stream, nome) => {
+      state.direto.add(ownerId);
+      const t = state.grid.attach(ownerId, stream, nome);
+      t.video.volume = state.volGame;
+      updateWaitingState();
+    },
+    onFim: (ownerId) => {
+      state.grid.remove(ownerId);
+      updateWaitingState();
+    },
+    onDireto: (ownerId, direto) => {
+      if (direto) {
+        state.direto.add(ownerId);
+      } else {
+        state.direto.delete(ownerId);
+        // O host volta a repassar: reaproveita as faixas que ele já mandou
+        // em vez de esperar uma renegociação.
+        state.hostRouter?.drain();
+      }
+      // Pedido ao host: pare (ou volte) a repassar a tela desta pessoa pra
+      // mim. É o que tira o trabalho do PC dele.
+      state.signal?.signal(state.hostId, { control: "norelay", of: ownerId, on: direto });
+    },
+  });
+}
+
+/**
+ * Quem eu devo estar puxando direto agora: todo mundo que está ao vivo, na
+ * minha sala e não é o host (a tela do host já vem dele mesmo, sem repasse
+ * nenhum no meio). Chamado sempre que algo disso muda.
+ */
+function revisarMalha() {
+  const mesh = state.mesh;
+  if (!mesh || !state.me) return;
+  const minha = salaDe(state.me);
+
+  for (const id of state.live.keys()) {
+    if (id === state.me.id || id === state.hostId) continue;
+    const p = state.people.get(id);
+    if (p && salaDe(p) === minha) mesh.assistir(id, p.name);
+    else mesh.parar(id);
+  }
+  // e solta quem não está mais ao vivo
+  for (const id of [...mesh.vendo.keys()]) {
+    if (!state.live.has(id)) mesh.parar(id);
+  }
+  limparGradeForaDaSala();
+}
+
 /* ========================================================== conexão === */
 
 function openHost(hostId) {
@@ -333,9 +426,19 @@ function openHost(hostId) {
   // reabriu o app e a conexão teve que ser refeita do zero.
   peer.on("negotiated", () => { sendMic(); sendOwnScreen(); });
 
-  trackRouter(peer, {
+  state.hostRouter = trackRouter(peer, {
     screen: (stream, ownerId, name) => {
       if (ownerId === state.me?.id) return; // a nossa própria já está na grade, local
+      // Se essa tela já está vindo direto do dono, o repasse do host é só o
+      // plano B — ignora, senão os dois ficam brigando pelo mesmo quadro.
+      if (state.direto.has(ownerId)) return;
+      // O roteador reprocessa faixas antigas sempre que o mapa muda, e o
+      // host pode repassar um instante antes de saber que eu troquei de sala
+      // ou que aquela pessoa parou. Sem estas duas checagens, uma tela que
+      // já acabou volta pra grade — congelada no último quadro, que é
+      // exatamente o defeito que a gente passou a sessão inteira caçando.
+      if (!state.live.has(ownerId)) return;
+      if (!naMinhaSala(ownerId)) return;
       const t = state.grid.attach(ownerId, stream, name);
       t.video.volume = state.volGame;
       updateWaitingState();
@@ -448,13 +551,19 @@ function sendOwnScreen() {
 function peerSetShareBitrate() {
   const tx = state.ownScreenTx[0]; // o de vídeo é sempre o primeiro
   if (tx) state.peer?.setBitrate(tx.sender, OWN_SHARE.bitrateKbps, OWN_SHARE.framerate, OWN_SHARE.resolution);
+  state.mesh?.ajustarQualidade(qualidadeAtual());
+}
+
+/** O teto de qualidade da NOSSA transmissão, no formato que a malha usa. */
+function qualidadeAtual() {
+  return { kbps: OWN_SHARE.bitrateKbps, fps: OWN_SHARE.framerate, resolucao: OWN_SHARE.resolution };
 }
 
 async function toggleShare() {
   if (state.ownScreen) return stopOwnScreen();
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia(
-      displayConstraints(OWN_SHARE.framerate)
+      displayConstraints(OWN_SHARE.framerate, OWN_SHARE.resolution)
     );
     startOwnScreen(stream);
   } catch (err) {
@@ -477,6 +586,9 @@ function startOwnScreen(stream) {
 
   state.grid.attach(state.me.id, stream, `${state.me.name} (você)`, { muted: true });
   sendOwnScreen();
+  // O host recebe a tela pra ver e como reserva; quem só vai assistir pega
+  // direto daqui, sem passar pela máquina dele.
+  state.mesh?.publicar(stream, state.me.name, qualidadeAtual());
   state.signal.send({ t: "live", on: true });
   updateWaitingState();
 
@@ -492,6 +604,7 @@ function stopOwnScreen(silent = false) {
   for (const tx of state.ownScreenTx) { try { tx.sender.replaceTrack(null); } catch {} }
   state.ownScreenTx = [];
   state.screenSent = false;
+  state.mesh?.publicar(null);   // derruba quem estava me assistindo direto
   if (state.me?.id) state.grid.remove(state.me.id);
   updateWaitingState();
   if (silent) return;
@@ -514,7 +627,8 @@ async function toggleMic() {
   }
 
   try {
-    state.mic = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    state.micRaw = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    state.mic = montarVoz(state.micRaw);
     sendMic();
     setMic(true);
   } catch {
@@ -522,6 +636,28 @@ async function toggleMic() {
       ? "Microfone negado pelo navegador."
       : "Sem HTTPS o navegador bloqueia o microfone.", "err");
   }
+}
+
+function efeitoEscolhido() {
+  return localStorage.getItem("sabor.voz") || "normal";
+}
+
+/** Passa o microfone cru pela cadeia de efeitos e devolve o que vai pra rede.
+ *  O stream que sai é sempre o mesmo objeto, então trocar de efeito depois
+ *  não mexe na conexão — ninguém precisa renegociar nada. */
+function montarVoz(cru) {
+  state.voz = state.voz || new Voz();
+  state.voz.conectar(cru);
+  state.voz.aplicar(efeitoEscolhido());
+  return state.voz.stream;
+}
+
+/** Solta o microfone de verdade (o cru é o que prende o aparelho). */
+function pararMic() {
+  state.micRaw?.getTracks().forEach((t) => t.stop());
+  state.micRaw = null;
+  state.voz?.desmontar();
+  state.mic = null;
 }
 
 function setMic(on) {
@@ -565,6 +701,20 @@ function wireRoom() {
   $("#btn-mic").replaceChildren(icon("micOff"));
   $("#btn-mic").classList.add("danger");
   $("#btn-mic").addEventListener("click", toggleMic);
+
+  $("#btn-voz").replaceChildren(icon("magia"));
+  $("#btn-voz").addEventListener("click", (e) => {
+    e.currentTarget.closest(".slider-pop").classList.toggle("open");
+  });
+  const selVoz = $("#voz-efeito");
+  selVoz.replaceChildren(...EFEITOS.map((f) => el("option", { value: f.id }, f.nome)));
+  selVoz.value = efeitoEscolhido();
+  selVoz.addEventListener("change", (e) => {
+    localStorage.setItem("sabor.voz", e.target.value);
+    state.voz?.aplicar(e.target.value);   // troca na hora, sem mexer na conexão
+    $("#btn-voz").classList.toggle("active", e.target.value !== "normal");
+  });
+  $("#btn-voz").classList.toggle("active", efeitoEscolhido() !== "normal");
   $("#btn-volume").replaceChildren(icon("volume"));
   $("#btn-volume").addEventListener("click", (e) => {
     e.currentTarget.closest(".slider-pop").classList.toggle("open");
@@ -585,6 +735,7 @@ function wireRoom() {
   $("#btn-leave").addEventListener("click", () => {
     if (!confirm("Sair da sala?")) return;
     stopOwnScreen(true);
+    state.mesh?.fechar();
     state.signal?.close();
     state.peer?.close();
     blocked("Você saiu", "Até a próxima.", true);

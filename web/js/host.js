@@ -5,6 +5,7 @@ import { $, $$, el, icon, toast, avatarFor, initials, colorFor, fmtDuration, fmt
 import { Signal } from "./signal.js";
 import { Peer, displayConstraints, preferVideoCodecs, natMapping, isCgnatRange, MIC_CONSTRAINTS, trackRouter } from "./rtc.js";
 import { Grid } from "./grid.js";
+import { Voz, EFEITOS } from "./voz.js";
 
 /* ======================================================== estado ====== */
 
@@ -14,14 +15,16 @@ const state = {
   desktop: false,
   signal: null,
   me: null,
-  peers: new Map(),   // peerId -> { info, peer, tx:{video,sys,voice}, relay:Map<key,Set<transceiver>> }
+  peers: new Map(),   // peerId -> { info, peer, tx:{video,sys,voice}, relay:Map<key,Set<transceiver>>, noRelay:Set<ownerId> }
   guestVoice: new Map(),  // peerId -> { track, stream }
   guestScreen: new Map(), // peerId -> { stream, tracks:[...], name }
   live: new Map(),        // peerId -> startedAt (quem esta transmitindo agora, host ou convidado)
   salas: [],              // [{id, name}] — cada pessoa está em uma delas
   grid: null,              // Grid: um card por transmissao ao vivo na sala
   screen: null,       // MediaStream da captura
-  mic: null,          // MediaStream do microfone
+  mic: null,          // MediaStream que VAI pros outros (já com efeito)
+  micRaw: null,       // o microfone cru, como veio do navegador
+  voz: null,          // Voz: a cadeia de efeitos entre um e outro
   micOn: false,
   // Desligada por padrão: desenhar a própria captura aqui disputa GPU com o
   // jogo, e é a causa mais comum de perder FPS transmitindo. Quem quiser ver
@@ -370,7 +373,24 @@ function connect() {
     if (e) { e.info.muted = m.muted; renderPeople(); }
   });
 
-  sig.on("signal", (m) => state.peers.get(m.from)?.peer.accept(m.payload));
+  sig.on("signal", (m) => {
+    const entry = state.peers.get(m.from);
+    if (!entry) return;
+    // Um convidado avisando que conseguiu pegar a tela de outro DIRETO com
+    // ele: paramos de repassar aquela tela pra esta pessoa. É o que tira o
+    // trabalho de re-codificar daqui — a máquina que está jogando. O pedido
+    // só chega depois que a conexão direta dele fechou, e volta atrás
+    // sozinho (on:false) se ela cair.
+    if (m.payload?.control === "norelay") {
+      const de = String(m.payload.of || "");
+      if (!de) return;
+      if (m.payload.on) entry.noRelay.add(de);
+      else entry.noRelay.delete(de);
+      applySalas();
+      return;
+    }
+    entry.peer.accept(m.payload);
+  });
   sig.on("chat", addChat);
   sig.on("replaced", () => {
     setConn("err", "painel movido");
@@ -410,7 +430,7 @@ function addGuest(info, { relayOnly = false } = {}) {
   // antes da primeira oferta: manda o vídeo para o encoder da GPU
   state.codec = preferVideoCodecs(tx.video) || state.codec;
 
-  const entry = { info, peer, tx, relay: new Map(), relayOnly };
+  const entry = { info, peer, tx, relay: new Map(), noRelay: new Set(), relayOnly };
   state.peers.set(info.id, entry);
 
   // Envia o que já estiver rolando.
@@ -733,7 +753,8 @@ function applySalas() {
     }
     for (const [gid, tela] of state.guestScreen) {
       const chave = `screen:${gid}`;
-      if (gid !== entry.info.id && salaDe(gid) === entry.info.sala) {
+      // `noRelay`: ele já está pegando essa tela direto com o dono.
+      if (gid !== entry.info.id && salaDe(gid) === entry.info.sala && !entry.noRelay.has(gid)) {
         for (const t of tela.tracks) relayTrack(entry, chave, t, tela.stream);
       } else {
         removeRelayKey(entry, chave);
@@ -811,6 +832,12 @@ function updateBadge() {
 
 /* ======================================================== microfone === */
 
+/** O efeito de voz fica no navegador, não nas configurações do servidor: é
+ *  escolha de quem está falando, não da sala. */
+function efeitoEscolhido() {
+  return localStorage.getItem("sabor.voz") || "normal";
+}
+
 async function toggleMic() {
   if (state.micOn) return setMic(false);
   try {
@@ -818,14 +845,24 @@ async function toggleMic() {
     const deviceId = $("#set-mic").value;
     if (deviceId) constraints.audio.deviceId = { exact: deviceId };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    state.mic = stream;
-    const track = stream.getAudioTracks()[0];
+    state.micRaw = stream;
+
+    // O microfone passa pela cadeia de efeitos antes de virar o que os
+    // outros ouvem. O stream que sai de lá é sempre o mesmo objeto, então
+    // trocar de voz depois não mexe na conexão com ninguém.
+    state.voz = state.voz || new Voz();
+    state.voz.conectar(stream);
+    state.voz.aplicar(efeitoEscolhido());
+    state.mic = state.voz.stream;
+
+    const track = state.mic.getAudioTracks()[0];
     outVoice.getTracks().forEach((t) => outVoice.removeTrack(t));
     outVoice.addTrack(track);
-    for (const entry of state.peers.values()) {
-      entry.tx.voice.sender.replaceTrack(track).catch(() => {});
-    }
+    applySalas(); // a voz só vai pra quem está na minha sala
+
     state.meter?.stop();
+    // O medidor olha o microfone CRU: ele responde "o Windows está te
+    // ouvindo?", pergunta que não deveria depender do efeito escolhido.
     state.meter = createVoiceMeter(stream, (lvl) => {
       $("#mic-level").style.width = `${Math.round(lvl * 100)}%`;
     });
@@ -840,7 +877,11 @@ async function toggleMic() {
 function setMic(on) {
   state.micOn = on;
   if (!on) {
-    state.mic?.getTracks().forEach((t) => t.stop());
+    // Só o microfone cru precisa ser parado: o outro é saída do Web Audio,
+    // não um dispositivo. A cadeia de efeitos fica de pé pro próximo uso.
+    state.micRaw?.getTracks().forEach((t) => t.stop());
+    state.micRaw = null;
+    state.voz?.desmontar();
     state.mic = null;
     state.meter?.stop();
     state.meter = null;
@@ -933,6 +974,11 @@ function setPreview(on) {
   const btn = $("#btn-preview");
   btn.replaceChildren(icon(on ? "eye" : "eyeOff"));
   btn.classList.toggle("active", !on);
+  // Dá pra ligar e desligar a qualquer momento, inclusive no meio da
+  // transmissão — quem assiste não vê diferença nenhuma.
+  btn.title = on
+    ? "Desligar a prévia (devolve FPS pro jogo)"
+    : "Ligar a prévia (usa GPU pra desenhar sua tela aqui)";
 }
 
 /** Mostra no selo do preview qual codec e qual encoder estão em uso. */
@@ -1130,6 +1176,15 @@ function wireUi() {
     for (const entry of state.peers.values()) applyBitrate(entry);
   });
   $("#set-mic").addEventListener("change", () => { if (state.micOn) { setMic(false); toggleMic(); } });
+
+  // efeito de voz — a lista vem do próprio módulo
+  const selVoz = $("#set-voz");
+  selVoz.replaceChildren(...EFEITOS.map((e) => el("option", { value: e.id }, e.nome)));
+  selVoz.value = efeitoEscolhido();
+  selVoz.addEventListener("change", (e) => {
+    localStorage.setItem("sabor.voz", e.target.value);
+    state.voz?.aplicar(e.target.value);   // troca na hora, sem mexer na conexão
+  });
   $("#set-talk").addEventListener("change", (e) => save({ guests_can_talk: e.target.checked }));
   $("#set-autotunnel").addEventListener("change", (e) => save({ auto_tunnel: e.target.checked }));
   $("#set-forcerelay").addEventListener("change", (e) => {
