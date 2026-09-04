@@ -312,13 +312,27 @@ export function displayConstraints(framerate) {
       frameRate: { ideal: framerate, max: framerate },
       cursor: "motion",
     },
-    audio: {
-      autoGainControl: false,
-      echoCancellation: false,
-      noiseSuppression: false,
-      channelCount: 2,
-      sampleRate: 48000,
-    },
+    // `audio: true` e não um objeto de constraints: pedir coisas como
+    // `channelCount` ou `echoCancellation: false` aqui é o caminho conhecido
+    // pra captura de tela voltar SEM faixa de áudio nenhuma — a pessoa marca
+    // "compartilhar áudio" no seletor e não sai som. O que a gente queria com
+    // aquilo (não tratar o som como voz) já vem do `contentHint = "music"`,
+    // aplicado na faixa depois que ela chega.
+    audio: true,
+    // Pede explicitamente que o seletor ofereça o áudio do sistema.
+    systemAudio: "include",
+    // E que compartilhar uma JANELA também leve som. Esse é o caso que mais
+    // quebrava: ao escolher a janela do jogo, o áudio fica de fora por
+    // padrão — "system" pede o som todo em vez de nenhum. (Windows não sabe
+    // isolar o áudio de uma janela só, então o certo aqui é o som do
+    // sistema, não "window".)
+    windowAudio: "system",
+    // Tira a própria janela do app da lista. Sem isso, no app de desktop a
+    // única "aba" que aparece pra escolher é a do próprio Sabor DC — quem
+    // escolhia caía num espelho infinito (a prévia dentro da prévia).
+    selfBrowserSurface: "exclude",
+    // Deixa trocar de fonte pelo botão do próprio Chrome, sem refazer tudo.
+    surfaceSwitching: "include",
   };
 }
 

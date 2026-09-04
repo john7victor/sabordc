@@ -363,6 +363,20 @@ bordas** (*Borderless/Fullscreen Windowed*) nas opções de vídeo dele — aí 
 vira uma janela normal e passa a aparecer na lista. É o mesmo ajuste que já
 ajuda a performance (ver "Desempenho" mais abaixo).
 
+**Marquei “compartilhar áudio” e ninguém ouve.** Olhe o ícone de som na barra
+de baixo do painel: ele agora diz a verdade sobre o que está sendo enviado —
+fica **vermelho** quando a captura veio sem faixa de áudio nenhuma, e o app
+avisa na hora de escolher a fonte. Nesse caso não adianta clicar nele; é
+preciso encerrar e escolher a fonte de novo. Duas causas comuns:
+
+* **Compartilhar uma janela.** Windows não sabe isolar o áudio de uma janela
+  só, então esse modo costuma vir sem som. O app agora pede explicitamente o
+  áudio do sistema junto (`windowAudio: "system"`), mas se ainda vier mudo,
+  compartilhe a **tela inteira** — nela o áudio funciona sempre.
+* **A caixa não estava marcada.** É fácil passar batido: ela fica no canto de
+  baixo do seletor, e some quando a aba escolhida é "Janela" em alguns
+  runtimes do WebView2.
+
 **A janela do app não abre o seletor de tela.** O seletor nativo do WebView2
 (Janela / Tela Inteira + "compartilhar áudio do sistema") funciona normalmente
 em runtimes atuais. Se o seu for antigo e não abrir, *Ajustes → Abrir painel no

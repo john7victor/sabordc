@@ -52,8 +52,15 @@ export class Grid {
   /** Liga (ou troca) o stream mostrado num card, criando-o se precisar. */
   attach(id, stream, label, opts) {
     const t = this.ensure(id, label, opts);
-    if (t.video.srcObject !== stream) {
+    // Reatar também quando é o MESMO stream mas com outra quantidade de
+    // faixas: o vídeo e o áudio da tela chegam em eventos separados, e o
+    // elemento <video> nem sempre passa a tocar uma faixa de áudio que foi
+    // adicionada ao stream depois que o srcObject já tinha sido definido —
+    // é assim que uma transmissão fica muda mesmo com o áudio chegando.
+    const faixas = stream ? stream.getTracks().length : 0;
+    if (t.video.srcObject !== stream || t.faixas !== faixas) {
       t.video.srcObject = stream;
+      t.faixas = faixas;
       t.video.play().catch(() => {});
     }
     return t;
@@ -77,6 +84,7 @@ export class Grid {
     } else {
       t.video.pause();
       t.video.srcObject = null;
+      t.faixas = 0;
     }
   }
 

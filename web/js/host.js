@@ -590,7 +590,15 @@ function setScreen(stream) {
   // é bom para slides e péssimo para jogo — é o que causa o engasgo.
   video.contentHint = "motion";
   const sysAudio = stream.getAudioTracks()[0];
-  if (sysAudio) sysAudio.contentHint = "music"; // som de jogo, não voz
+  if (sysAudio) {
+    sysAudio.contentHint = "music"; // som de jogo, não voz
+  } else {
+    // Falar agora, que é quando ainda dá pra corrigir escolhendo a fonte de
+    // novo. Descobrir isso pelo amigo dizendo "não tô ouvindo nada" no meio
+    // da partida é tarde demais.
+    toast("Esta fonte veio sem áudio — marque “compartilhar áudio” ao escolher a fonte.", "err");
+  }
+  renderAudioShare();
 
   state.grid.ensure(myId(), state.settings.display_name || "Você", { muted: true });
   setPreview(state.previewOn);
@@ -639,6 +647,7 @@ function stopScreen(silent = false) {
   $("#btn-live").classList.remove("btn-danger");
   $("#live-pill").hidden = true;
   state.liveSince = null;
+  renderAudioShare();
   state.signal?.send({ t: "live", on: false });
   broadcastMap();
   maybeDownloadUpdate(); // ficou pendente enquanto estava no ar
@@ -749,6 +758,33 @@ async function tickStats() {
 }
 
 /**
+ * Deixa o botão de áudio dizer a verdade sobre o que está sendo enviado.
+ *
+ * Antes ele mostrava o ícone de "som ligado" em qualquer situação — inclusive
+ * quando a captura tinha vindo sem faixa de áudio nenhuma. Quem marcava
+ * "compartilhar áudio" e mesmo assim não era ouvido não tinha como saber
+ * onde estava o problema; o painel afirmava que estava tudo certo.
+ */
+function renderAudioShare() {
+  const btn = $("#btn-audio-share");
+  if (!btn) return;
+  const track = state.screen?.getAudioTracks()[0];
+  const ligado = !!track && track.enabled;
+  const semAudio = !!state.screen && !track;
+
+  btn.replaceChildren(icon(ligado ? "volume" : "volumeOff"));
+  btn.classList.toggle("active", ligado);
+  btn.classList.toggle("danger", semAudio);
+  btn.title = !state.screen
+    ? "Áudio do sistema (comece a transmitir primeiro)"
+    : semAudio
+    ? "Esta fonte veio SEM áudio — troque a fonte e marque “compartilhar áudio”"
+    : ligado
+    ? "Áudio do sistema indo junto — clique pra silenciar"
+    : "Áudio do sistema silenciado — clique pra voltar";
+}
+
+/**
  * Liga/desliga a prévia local. Ela não afeta o que os espectadores recebem —
  * é só a sua janela desenhando 1080p60 enquanto o jogo quer a mesma GPU.
  */
@@ -817,14 +853,18 @@ function wireUi() {
   $("#btn-mic").replaceChildren(icon("micOff"));
   $("#btn-mic").classList.add("danger");
   $("#btn-mic").addEventListener("click", toggleMic);
-  $("#btn-audio-share").replaceChildren(icon("volume"));
   $("#btn-audio-share").addEventListener("click", () => {
     const a = state.screen?.getAudioTracks()[0];
-    if (!a) return toast("Marque “compartilhar áudio” ao escolher a fonte.", "err");
+    if (!a) {
+      toast(state.screen
+        ? "Esta fonte veio sem áudio. Encerre e escolha de novo, marcando “compartilhar áudio”."
+        : "Comece a transmitir primeiro.", "err");
+      return;
+    }
     a.enabled = !a.enabled;
-    $("#btn-audio-share").classList.toggle("active", a.enabled);
-    $("#btn-audio-share").replaceChildren(icon(a.enabled ? "volume" : "volumeOff"));
+    renderAudioShare();
   });
+  renderAudioShare();
   $("#btn-preview").replaceChildren(icon("eye"));
   $("#btn-preview").addEventListener("click", () => setPreview(!state.previewOn));
   $("#btn-settings").replaceChildren(icon("gear"));
