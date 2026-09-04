@@ -31,6 +31,8 @@ const state = {
   settings: null,
   unread: 0,
   audioEls: new Map(),
+  update: null,       // { tag, page, asset, status } quando existe versão nova
+  updatePoll: null,
 };
 
 // Streams de saída: o id de cada um viaja no SDP e é a chave que diz ao
@@ -85,10 +87,11 @@ function isNewer(candidate, current) {
 }
 
 /**
- * Pergunta ao GitHub qual é a última versão publicada e mostra o aviso se
- * for mais nova que esta. Falha em silêncio de propósito: sem internet, com
- * a API fora do ar ou com o repositório ainda sem release nenhuma, o app não
- * tem nada de útil a dizer — e não é motivo pra encher o painel de erro.
+ * Pergunta ao GitHub qual é a última versão publicada e, se for mais nova,
+ * já começa a baixar o instalador em segundo plano — instalar depois vira um
+ * clique. Falha em silêncio de propósito: sem internet, com a API fora do ar
+ * ou com o repositório ainda sem release nenhuma, o app não tem nada de útil
+ * a dizer — e não é motivo pra encher o painel de erro.
  */
 async function checkUpdate() {
   try {
@@ -100,19 +103,95 @@ async function checkUpdate() {
     if (release.draft || release.prerelease) return;
     if (!isNewer(release.tag_name, state.boot.version)) return;
 
-    $("#update-version").textContent =
-      `${release.tag_name} · você está na ${state.boot.version}`;
+    state.update = {
+      tag: release.tag_name,
+      page: release.html_url,
+      // o .exe é o instalador; o .zip é a versão portátil, que não serve
+      // pra atualizar uma instalação existente
+      asset: (release.assets || []).find((a) => a.name.toLowerCase().endsWith(".exe")),
+    };
+
     $("#update-card").hidden = false;
-    $("#update-get").addEventListener("click", () => {
-      const url = release.html_url;
-      if (state.api?.open_url) state.api.open_url(url);
-      else window.open(url, "_blank", "noopener");
-    });
     $("#update-dismiss").replaceChildren(icon("x"));
     $("#update-dismiss").addEventListener("click", () => { $("#update-card").hidden = true; });
+    $("#update-get").addEventListener("click", onUpdateAction);
+    renderUpdate();
+    maybeDownloadUpdate();
   } catch {
     /* sem internet, ou o GitHub fora do ar: segue a vida */
   }
+}
+
+/**
+ * Só baixa fora do ar. Puxar 80 MB no meio de uma transmissão disputaria
+ * banda e disco justamente com o que a pessoa está fazendo — quando ela
+ * encerra, o `stopScreen` chama isto de novo.
+ */
+function maybeDownloadUpdate() {
+  const up = state.update;
+  if (!up || !up.asset) return;              // sem instalador anexado na release
+  if (!state.api?.start_update_download) return;  // aberto no navegador: só link
+  if (state.screen) return;                  // transmitindo: fica pra depois
+  if (up.status?.state === "downloading" || up.status?.state === "ready") return;
+
+  state.api.start_update_download(up.asset.browser_download_url).then((status) => {
+    up.status = status;
+    renderUpdate();
+    if (status.state === "downloading") pollUpdate();
+  });
+}
+
+function pollUpdate() {
+  clearInterval(state.updatePoll);
+  state.updatePoll = setInterval(async () => {
+    const status = await state.api.update_status();
+    state.update.status = status;
+    renderUpdate();
+    if (status.state !== "downloading") clearInterval(state.updatePoll);
+  }, 700);
+}
+
+function renderUpdate() {
+  const up = state.update;
+  if (!up) return;
+  const st = up.status?.state;
+  const versao = `${up.tag} · você está na ${state.boot.version}`;
+
+  if (st === "downloading") {
+    $("#update-version").textContent = `Baixando… ${up.status.percent}%`;
+    $("#update-get").hidden = true;
+  } else if (st === "ready") {
+    $("#update-version").textContent = `${up.tag} · baixada, pronta pra instalar`;
+    $("#update-get").hidden = false;
+    $("#update-get").textContent = "Instalar";
+  } else if (st === "error") {
+    $("#update-version").textContent = `${versao} · o download falhou`;
+    $("#update-get").hidden = false;
+    $("#update-get").textContent = "Baixar";
+  } else {
+    $("#update-version").textContent = versao;
+    $("#update-get").hidden = false;
+    $("#update-get").textContent = "Baixar";
+  }
+}
+
+/** O botão faz o que fizer sentido pro estado atual. */
+function onUpdateAction() {
+  const up = state.update;
+  if (up?.status?.state === "ready") {
+    if (state.screen && !confirm("Instalar agora encerra sua transmissão. Continuar?")) return;
+    state.api.run_update();
+    return;
+  }
+  if (state.api?.start_update_download && up?.asset) {
+    maybeDownloadUpdate();
+    return;
+  }
+  // navegador, ou release sem instalador anexado: manda pra página da versão
+  const url = up?.page;
+  if (!url) return;
+  if (state.api?.open_url) state.api.open_url(url);
+  else window.open(url, "_blank", "noopener");
 }
 
 /* ======================================================== bootstrap === */
@@ -562,6 +641,7 @@ function stopScreen(silent = false) {
   state.liveSince = null;
   state.signal?.send({ t: "live", on: false });
   broadcastMap();
+  maybeDownloadUpdate(); // ficou pendente enquanto estava no ar
 }
 
 function applyBitrate(entry) {

@@ -15,6 +15,7 @@ from typing import Any
 
 from .net import Tunnel, dns_report
 from .server import Server
+from .update import Updater
 
 
 class Api:
@@ -23,6 +24,7 @@ class Api:
         self._settings = server.settings
         self._tunnel = Tunnel(server.http_port)
         self._tunnel.on_ready = lambda: self._push("sabor:tunnel")
+        self._updater = Updater()
         self._window = None  # preenchido pelo run.py
 
     # -- estado ------------------------------------------------------------
@@ -125,6 +127,24 @@ class Api:
             f"/host?k={self._server.host_token}"
         )
         webbrowser.open(url)
+        return True
+
+    # -- atualizacao -------------------------------------------------------
+    def start_update_download(self, url: str) -> dict[str, Any]:
+        """Comeca a baixar a versao nova em segundo plano."""
+        if not isinstance(url, str):
+            return self._updater.snapshot()
+        return self._updater.start(url)
+
+    def update_status(self) -> dict[str, Any]:
+        return self._updater.snapshot()
+
+    def run_update(self) -> bool:
+        """Abre o instalador ja baixado e fecha o app pra ele poder substituir
+        os arquivos. O UAC do Windows aparece aqui."""
+        if not self._updater.run():
+            return False
+        self.close()
         return True
 
     def open_url(self, url: str) -> bool:

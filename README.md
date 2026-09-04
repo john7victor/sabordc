@@ -92,9 +92,24 @@ canto da sala.
 
 Ao abrir o painel, o app pergunta ao GitHub qual é a última versão publicada
 em [`john7victor/sabordc`](https://github.com/john7victor/sabordc/releases) e
-compara com a que está rodando. Se tiver uma mais nova, aparece um aviso na
-barra lateral com um botão que leva pro download — ele **não** troca de versão
-sozinho, justamente pra não puxar o tapete no meio de uma transmissão.
+compara com a que está rodando. Se tiver uma mais nova, ele **já baixa o
+instalador sozinho**, em segundo plano, e o aviso na barra lateral vira um
+botão de *Instalar* — o download, que é a parte demorada, já está feito.
+
+Instalar continua sendo um clique seu, e não tem como ser diferente: o
+instalador precisa de elevação (é ele que cria a regra do Firewall), então o
+UAC do Windows sempre vai aparecer. Também é melhor assim — trocar de versão
+sozinho fecharia o app no meio de uma transmissão.
+
+Duas proteções que valem citar:
+
+* **O download espera você sair do ar.** Puxar ~80 MB durante uma transmissão
+  disputaria banda e disco justamente com o que está acontecendo. Se você
+  estiver transmitindo, ele adia e começa quando você encerrar.
+* **Só baixa de um lugar.** O método exposto ao painel recusa qualquer
+  endereço que não comece com a URL de releases deste repositório — sem isso,
+  um painel comprometido teria como fazer o app baixar e rodar qualquer
+  executável da internet.
 
 O repositório é público de propósito: assim a consulta funciona sem token
 nenhum. Num repositório privado, o app precisaria carregar um segredo embutido
@@ -426,6 +441,28 @@ Setup. Saem duas coisas em `dist\`:
 A versão sai de três lugares que precisam concordar: `sabor/__init__.py`
 (`__version__`, é o que o app compara com o GitHub), `installer/sabor.iss`
 (`AppVersion`) e `installer/version_info.txt` (as propriedades do `.exe`).
+
+### Publicando uma versão
+
+Depois de bumpar os três e rodar o `build.bat`, a release vai pro GitHub com
+os dois arquivos anexados — o `.exe` é o que o auto-update baixa, então ele
+precisa estar lá:
+
+```bash
+gh release create v1.2.0 \
+  "dist/Sabor DC-1.2.0-setup.exe#Instalador (Windows)" \
+  "dist/Sabor DC-1.2.0-portatil.zip#Versão portátil" \
+  --title "Sabor DC 1.2.0" --notes "o que mudou"
+```
+
+Se o `gh` reclamar de login: o token que o Git guarda no Credential Manager
+serve, mas não tem o escopo que o `gh auth login` exige. Passe por variável de
+ambiente que funciona:
+
+```bash
+TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git credential fill | sed -n 's/^password=//p')
+GH_TOKEN="$TOKEN" gh release create ...
+```
 
 Precisa das ferramentas de build uma vez:
 

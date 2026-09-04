@@ -1,8 +1,8 @@
 # Recurso de versao do SABOR.exe (propriedades do arquivo no Windows).
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 1, 0, 0),
-    prodvers=(1, 1, 0, 0),
+    filevers=(1, 2, 0, 0),
+    prodvers=(1, 2, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,11 +16,11 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'Sabor DC'),
          StringStruct('FileDescription', 'Sabor DC - transmissao de tela e call'),
-         StringStruct('FileVersion', '1.1.0'),
+         StringStruct('FileVersion', '1.2.0'),
          StringStruct('InternalName', 'SABOR'),
          StringStruct('OriginalFilename', 'SABOR.exe'),
          StringStruct('ProductName', 'Sabor DC'),
-         StringStruct('ProductVersion', '1.1.0')])
+         StringStruct('ProductVersion', '1.2.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
