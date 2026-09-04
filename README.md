@@ -272,10 +272,18 @@ funciona sem instalar nada.
 | Taxa | 30 ou 60 fps |
 | Teto de banda | Por espectador — o painel mostra quanto de upload isso pede |
 
-**Nativa** pega a resolução de verdade do seu monitor (largura × altura × a
-escala do Windows) e manda isso pro Chrome como pedido explícito. Sem isso o
-Chrome tem liberdade pra escolher, e por padrão ele limita a captura de tela a
-1080p mesmo num monitor 1440p/4K.
+A escolha aparece num diálogo toda vez que você começa a transmitir — HD, Full
+HD, 2K ou Nativa, e 30 ou 60 fps — junto com o que aquilo custa de banda.
+
+**O que isso muda no FPS do jogo.** A qualidade escolhida vira um teto de
+**altura** na captura (`height: { max: 1080 }`, por exemplo). Isso importa
+porque a parte cara é capturar: num monitor 1440p, transmitir em 720p sem esse
+teto capturaria 1440p e só encolheria depois, gastando GPU à toa. Só a altura
+é limitada, nunca largura e altura juntas — pedir as duas define uma proporção
+alvo e faz o navegador **cortar** a imagem quando a fonte tem outra (é o que
+acontecia com quem joga em resolução esticada).
+
+**Nativa** não põe teto nenhum: captura sua tela como ela é. É a mais pesada.
 
 Trocar a resolução ou a taxa também ajusta o teto de banda sozinho, pro valor
 recomendado daquela qualidade — dá pra baixar na mão depois, mas o padrão já
@@ -317,9 +325,10 @@ O que o selo diz:
 
 **Ainda engasga?** Nesta ordem:
 
-1. **Desligue a prévia** (o ícone de olho na barra de baixo). Ela desenha
-   1080p60 dentro da janela do app, disputando GPU com o jogo. Não afeta nada
-   do que os espectadores veem.
+1. **Deixe a prévia desligada** (o ícone de olho na barra de baixo). Ela
+   desenha a captura dentro da janela do app, disputando GPU com o jogo — por
+   isso vem desligada por padrão, e o diálogo de qualidade pergunta antes de
+   cada transmissão. Não afeta nada do que os espectadores veem.
 2. Baixe para **1080p30** — metade do trabalho de codificação.
 3. Baixe para **720p60** se você prefere fluidez a nitidez.
 4. Rode o jogo em **janela sem bordas** em vez de tela cheia exclusiva: em tela

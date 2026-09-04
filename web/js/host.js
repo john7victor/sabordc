@@ -22,7 +22,10 @@ const state = {
   screen: null,       // MediaStream da captura
   mic: null,          // MediaStream do microfone
   micOn: false,
-  previewOn: true,
+  // Desligada por padrão: desenhar a própria captura aqui disputa GPU com o
+  // jogo, e é a causa mais comum de perder FPS transmitindo. Quem quiser ver
+  // liga no olho da barra de baixo — não muda nada pra quem assiste.
+  previewOn: false,
   codec: null,
   meter: null,
   liveSince: null,
@@ -548,11 +551,44 @@ function broadcastMap() {
 
 /* ======================================================== captura ===== */
 
+/* ------------------------------------------- escolher a qualidade ----- */
+
+/** Abre o diálogo de qualidade. É por aqui que toda transmissão começa. */
+function askQuality() {
+  const s = state.settings;
+  markChips("#q-res", s.resolution);
+  markChips("#q-fps", String(s.framerate));
+  $("#q-nopreview").checked = !state.previewOn;
+  updateQualityHint();
+  $("#quality-modal").hidden = false;
+}
+
+function markChips(seletor, valor) {
+  $$(`${seletor} .chip`).forEach((c) => c.classList.toggle("on", c.dataset.value === valor));
+}
+
+function chosenChip(seletor) {
+  return $(`${seletor} .chip.on`)?.dataset.value;
+}
+
+/** Diz, em números, o que a escolha custa — é a informação que falta pra
+ *  decidir entre "bonito" e "o jogo não engasga". */
+function updateQualityHint() {
+  const res = chosenChip("#q-res");
+  const fps = Number(chosenChip("#q-fps"));
+  const kbps = recommendedBitrate(res, fps);
+  const n = Math.max(1, state.peers.size);
+  $("#q-hint").textContent =
+    `Teto de ${(kbps / 1000).toFixed(1)} Mb/s por pessoa` +
+    (n > 1 ? ` · ~${((kbps * n) / 1000).toFixed(1)} Mb/s de upload com ${n} assistindo` : "") +
+    (res === "nativa" ? " · nativa captura sua tela inteira, é a mais pesada pro jogo" : "");
+}
+
 async function startScreen() {
   const s = state.settings;
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia(
-      displayConstraints(Number(s.framerate))
+      displayConstraints(Number(s.framerate), s.resolution)
     );
     setScreen(stream);
   } catch (err) {
@@ -847,9 +883,32 @@ function wireUi() {
     })
   );
 
-  $("#btn-live").addEventListener("click", () => (state.screen ? stopScreen() : startScreen()));
-  $("#go-live-hero").addEventListener("click", startScreen);
-  $("#btn-source").addEventListener("click", startScreen);
+  $("#btn-live").addEventListener("click", () => (state.screen ? stopScreen() : askQuality()));
+  $("#go-live-hero").addEventListener("click", askQuality);
+  $("#btn-source").addEventListener("click", askQuality);
+
+  // diálogo de qualidade
+  $$("#q-res .chip, #q-fps .chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      markChips(chip.parentElement.id === "q-res" ? "#q-res" : "#q-fps", chip.dataset.value);
+      updateQualityHint();
+    });
+  });
+  $("#q-cancel").addEventListener("click", () => { $("#quality-modal").hidden = true; });
+  $("#quality-modal").addEventListener("click", (e) => {
+    if (e.target.id === "quality-modal") $("#quality-modal").hidden = true;
+  });
+  $("#q-go").addEventListener("click", () => {
+    const resolution = chosenChip("#q-res");
+    const framerate = Number(chosenChip("#q-fps"));
+    save({ resolution, framerate });
+    $("#set-res").value = resolution;
+    $("#set-fps").value = String(framerate);
+    applyRecommendedBitrate({ quiet: true });
+    state.previewOn = !$("#q-nopreview").checked;
+    $("#quality-modal").hidden = true;
+    startScreen();
+  });
   $("#btn-mic").replaceChildren(icon("micOff"));
   $("#btn-mic").classList.add("danger");
   $("#btn-mic").addEventListener("click", toggleMic);
@@ -1090,7 +1149,7 @@ function recommendedBitrate(resolution, framerate) {
 /** Sobe o slider pro valor recomendado da qualidade atual — chamado sempre
  *  que resolução ou taxa mudam. Continua manual depois disso: a pessoa pode
  *  baixar de novo se preferir, isso só evita o esquecimento. */
-function applyRecommendedBitrate() {
+function applyRecommendedBitrate({ quiet = false } = {}) {
   const kbps = recommendedBitrate(state.settings.resolution, Number(state.settings.framerate));
   $("#set-bitrate").value = kbps;
   $("#bitrate-out").textContent = `${(kbps / 1000).toFixed(1)} Mb/s`;
@@ -1098,7 +1157,9 @@ function applyRecommendedBitrate() {
   state.api?.save_settings({ bitrate_kbps: kbps });
   for (const entry of state.peers.values()) applyBitrate(entry);
   updateBitrateHint(kbps);
-  toast(`Teto de banda ajustado para ${(kbps / 1000).toFixed(1)} Mb/s — recomendado pra essa qualidade.`, "");
+  if (!quiet) {
+    toast(`Teto de banda ajustado para ${(kbps / 1000).toFixed(1)} Mb/s — recomendado pra essa qualidade.`, "");
+  }
 }
 
 function updateBitrateHint(kbps) {

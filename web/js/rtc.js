@@ -306,11 +306,28 @@ export const RESOLUTION_LONG_EDGE = { "720p": 1280, "1080p": 1920, "1440p": 2560
  * cortados. A resolução vira teto de qualidade DEPOIS, sobre o que já foi
  * capturado — nunca corta, só escala mantendo a proporção original.
  */
-export function displayConstraints(framerate) {
+/** Altura máxima de captura por qualidade. `nativa` não entra: sem teto. */
+export const RESOLUTION_HEIGHT = { "720p": 720, "1080p": 1080, "1440p": 1440 };
+
+/**
+ * @param {number} framerate
+ * @param {string} [resolution] "720p" | "1080p" | "1440p" | "nativa"
+ */
+export function displayConstraints(framerate, resolution) {
+  const alturaMax = resolution && RESOLUTION_HEIGHT[resolution];
   return {
     video: {
       frameRate: { ideal: framerate, max: framerate },
       cursor: "motion",
+      // SÓ a altura, nunca largura+altura juntas. Pedir as duas define uma
+      // proporção alvo, e aí o navegador CORTA a imagem pra encaixar quando a
+      // fonte tem outra (foi o bug de quem joga em resolução esticada). Com
+      // uma dimensão só, ele reduz mantendo a proporção — sem cortar nada.
+      //
+      // Isto é o que faz diferença no FPS do jogo: capturar 1440p/4K e só
+      // depois encolher no encoder gasta GPU à toa. Aqui a captura já sai
+      // pequena, que é o trabalho que o jogo deixa de disputar.
+      ...(alturaMax ? { height: { max: alturaMax } } : {}),
     },
     // `audio: true` e não um objeto de constraints: pedir coisas como
     // `channelCount` ou `echoCancellation: false` aqui é o caminho conhecido

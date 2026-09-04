@@ -292,6 +292,44 @@
   </main>
 </div>
 
+<div class="modal-overlay" id="quality-modal" hidden>
+  <div class="modal-card">
+    <h2>Como você quer transmitir?</h2>
+    <p>Quanto maior a resolução e a taxa, mais GPU a captura tira do jogo.</p>
+
+    <div class="field">
+      <label>Resolução</label>
+      <div class="chips" id="q-res">
+        <button class="chip" type="button" data-value="720p"><b>HD</b><span>720p · mais leve</span></button>
+        <button class="chip" type="button" data-value="1080p"><b>Full HD</b><span>1080p · equilibrado</span></button>
+        <button class="chip" type="button" data-value="1440p"><b>2K</b><span>1440p · pesado</span></button>
+        <button class="chip" type="button" data-value="nativa"><b>Nativa</b><span>sua tela · mais pesado</span></button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Taxa de quadros</label>
+      <div class="chips" id="q-fps">
+        <button class="chip" type="button" data-value="30"><b>30 fps</b><span>metade do trabalho</span></button>
+        <button class="chip" type="button" data-value="60"><b>60 fps</b><span>mais fluido</span></button>
+      </div>
+    </div>
+
+    <label class="switch">
+      <input type="checkbox" id="q-nopreview" checked>
+      <span class="track"></span>
+      <span class="label">Não desenhar a prévia aqui (devolve FPS pro jogo)</span>
+    </label>
+
+    <span class="hint" id="q-hint"></span>
+
+    <div class="modal-acts">
+      <button class="btn" id="q-cancel" type="button">Cancelar</button>
+      <button class="btn btn-primary" id="q-go" type="button">Escolher fonte</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="watch-modal" hidden>
   <div class="modal-card">
     <h2>Assistir uma transmissão</h2>
