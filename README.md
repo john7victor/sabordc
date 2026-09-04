@@ -88,6 +88,16 @@ a sua transmissão (se tiver uma rolando) e desconecta quem estiver na sua
 sala — o app avisa antes. Pra voltar, é só clicar em **"← Meu painel"** no
 canto da sala.
 
+### O painel
+
+Três colunas, no formato do Discord:
+
+| Coluna | O que tem |
+| --- | --- |
+| Esquerda | As salas, com quem está dentro de cada uma, e no rodapé você (nome, sala, microfone, ajustes) |
+| Centro | O que está sendo transmitido, os números da transmissão e os controles |
+| Direita | Chat, o link pra convidar, e os ajustes |
+
 ### Salas e sorteio de times
 
 A lista de pessoas é agrupada por **sala**, como os canais de voz do Discord.

@@ -35,6 +35,44 @@
 
   <main class="workspace">
 
+    <!-- ------------------------------------- salas e membros (esquerda) -->
+    <aside class="channels">
+      <div class="channels-hd">
+        <span class="room-title" id="room-title">Sala</span>
+        <span class="badge" id="tab-count">0</span>
+      </div>
+
+      <div class="updatecard" id="update-card" hidden>
+        <div class="update-text">
+          <b>Versão nova disponível</b>
+          <span id="update-version"></span>
+        </div>
+        <button class="btn btn-primary" id="update-get">Baixar</button>
+        <button class="icon-btn" id="update-dismiss" title="Agora não"></button>
+      </div>
+
+      <div class="channels-scroll" id="people-list"></div>
+
+      <div class="channels-foot">
+        <div class="sala-acts">
+          <button class="btn" id="btn-sortear" title="Embaralha todo mundo e divide em Time A e Time B">Sortear times</button>
+          <button class="btn" id="btn-reunir" title="Traz todo mundo de volta pra primeira sala">Reunir</button>
+          <button class="btn btn-ghost" id="btn-nova-sala" title="Criar sala">+</button>
+        </div>
+
+        <div class="userbar">
+          <span class="avatar" id="me-avatar">EU</span>
+          <div class="userbar-meta">
+            <b id="me-name">Você</b>
+            <span id="me-sala">Geral</span>
+          </div>
+          <button class="icon-btn" id="btn-mic" title="Microfone (Ctrl+M)"></button>
+          <button class="icon-btn" id="btn-settings" title="Ajustes"></button>
+        </div>
+        <div class="mic-meter"><span id="mic-level"></span></div>
+      </div>
+    </aside>
+
     <!-- ------------------------------------------------------ palco -- -->
     <section class="stage">
 
@@ -85,69 +123,53 @@
 
         <button class="icon-btn" id="btn-preview" title="Desligar a prévia (economiza GPU enquanto joga)"></button>
         <button class="icon-btn" id="btn-audio-share" title="Enviar áudio do sistema"></button>
-        <button class="icon-btn" id="btn-settings" title="Ajustes"></button>
       </div>
     </section>
 
-    <!-- --------------------------------------------------- barra lateral -->
+    <!-- --------------------------------------------- chat/link/ajustes -->
     <aside class="sidebar">
 
-      <div class="updatecard" id="update-card" hidden>
-        <div class="update-text">
-          <b>Versão nova disponível</b>
-          <span id="update-version"></span>
-        </div>
-        <button class="btn btn-primary" id="update-get">Baixar</button>
-        <button class="icon-btn" id="update-dismiss" title="Agora não"></button>
-      </div>
-
-      <div class="linkcard">
-        <div class="card-hd">
-          <span class="eyebrow">Link da sala</span>
-          <button class="btn-ghost btn linkmode" id="btn-rotate" title="Gerar um link novo e derrubar o antigo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-.6 4M20 5v6h-6"/></svg>
-          </button>
-        </div>
-
-        <div class="linkbox">
-          <input type="text" id="link-value" readonly spellcheck="false">
-          <button class="btn btn-primary" id="btn-copy">Copiar</button>
-        </div>
-
-        <div class="linkscope" id="linkscope"></div>
-
-        <button class="btn-ghost btn btn-block watch-link" id="btn-watch-open" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
-          Assistir uma transmissão
-        </button>
-      </div>
-
       <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="people" role="tab">Pessoas <span class="badge" id="tab-count">0</span></button>
-        <button class="tab" data-tab="chat" role="tab">Chat <span class="badge dotbadge" id="chat-badge" hidden></span></button>
+        <button class="tab active" data-tab="chat" role="tab">Chat <span class="badge dotbadge" id="chat-badge" hidden></span></button>
+        <button class="tab" data-tab="convidar" role="tab">Convidar</button>
         <button class="tab" data-tab="settings" role="tab">Ajustes</button>
       </nav>
 
       <div class="panels">
 
-        <div class="panel active" data-panel="people">
-          <div class="panel-scroll" id="people-list"></div>
-          <div class="panel-foot">
-            <div class="sala-acts">
-              <button class="btn" id="btn-sortear" title="Embaralha todo mundo e divide em Time A e Time B">Sortear times</button>
-              <button class="btn" id="btn-reunir" title="Traz todo mundo de volta pra primeira sala">Reunir</button>
-              <button class="btn btn-ghost" id="btn-nova-sala" title="Criar sala">+</button>
-            </div>
-            <button class="btn btn-block" id="btn-mute-all">Silenciar todos</button>
-            <label class="switch" style="margin-top:10px">
-              <input type="checkbox" id="lock-room">
-              <span class="track"></span>
-              <span class="label">Trancar a sala (ninguém novo entra)</span>
-            </label>
+        <div class="panel" data-panel="convidar">
+          <div class="panel-scroll settings">
+            <section class="group">
+              <div class="card-hd">
+                <span class="eyebrow">Link da sala</span>
+                <button class="btn-ghost btn linkmode" id="btn-rotate" title="Gerar um link novo e derrubar o antigo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-.6 4M20 5v6h-6"/></svg>
+                </button>
+              </div>
+              <div class="linkbox">
+                <input type="text" id="link-value" readonly spellcheck="false">
+                <button class="btn btn-primary" id="btn-copy">Copiar</button>
+              </div>
+              <div class="linkscope" id="linkscope"></div>
+              <button class="btn-ghost btn btn-block watch-link" id="btn-watch-open" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+                Assistir uma transmissão
+              </button>
+            </section>
+
+            <section class="group">
+              <span class="eyebrow">Moderação</span>
+              <button class="btn btn-block" id="btn-mute-all">Silenciar todos</button>
+              <label class="switch">
+                <input type="checkbox" id="lock-room">
+                <span class="track"></span>
+                <span class="label">Trancar a sala (ninguém novo entra)</span>
+              </label>
+            </section>
           </div>
         </div>
 
-        <div class="panel" data-panel="chat">
+        <div class="panel active" data-panel="chat">
           <div class="panel-scroll chat-log" id="chat-log"></div>
           <form class="chat-form" id="chat-form">
             <input type="text" id="chat-input" placeholder="Mandar mensagem…" maxlength="500" autocomplete="off">

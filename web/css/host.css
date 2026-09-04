@@ -52,13 +52,57 @@
 .win-btn.close::after { transform: rotate(-45deg); }
 
 /* -------------------------------------------------------- workspace --- */
+/* Três colunas, como o Discord: salas e quem está nelas à esquerda, o palco
+   no meio, e chat/ajustes à direita. */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 344px;
+  grid-template-columns: 248px minmax(0, 1fr) 320px;
   gap: 14px;
   padding: 14px;
   min-height: 0;
 }
+
+/* ------------------------------------------- salas e membros (esquerda) */
+.channels {
+  display: flex; flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.channels-hd {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line-soft);
+  flex: none;
+}
+.room-title {
+  flex: 1; min-width: 0;
+  font-size: 13.5px; font-weight: 650; letter-spacing: -.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.channels-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; }
+.channels-foot {
+  flex: none;
+  padding: 10px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-soft);
+}
+.channels .updatecard { margin: 10px 10px 0; }
+
+/* rodapé com você, microfone e ajustes — o "user bar" do Discord */
+.userbar { display: flex; align-items: center; gap: 8px; }
+.userbar .avatar { width: 28px; height: 28px; font-size: 11px; background: var(--grad); }
+.userbar-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.userbar-meta b {
+  font-size: 12.5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.userbar-meta span { font-size: 10.5px; color: var(--muted); }
+.userbar .icon-btn { width: 28px; height: 28px; flex: none; }
+.userbar .icon-btn svg { width: 14px; height: 14px; }
+.channels-foot .mic-meter { width: 100%; margin-top: 8px; }
 
 /* ------------------------------------------------------------ palco --- */
 .stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
@@ -157,16 +201,8 @@
   min-height: 0;
 }
 
-.linkcard {
-  background: var(--panel);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r);
-  padding: 12px;
-  flex: none;
-}
-.linkcard .card-hd { margin-bottom: 9px; }
-.linkcard .linkmode { height: 24px; width: 28px; padding: 0; }
-.linkcard .linkmode svg { width: 14px; height: 14px; }
+.linkmode { height: 24px; width: 28px; padding: 0; flex: none; }
+.linkmode svg { width: 14px; height: 14px; }
 
 .linkbox { display: flex; gap: 7px; }
 .linkbox input {
@@ -306,7 +342,6 @@
 .panel { display: none; height: 100%; flex-direction: column; }
 .panel.active { display: flex; }
 .panel-scroll { flex: 1; overflow-y: auto; padding: 12px; min-height: 0; }
-.panel-foot { padding: 12px; border-top: 1px solid var(--line-soft); flex: none; }
 .panel .chat-form { padding: 12px; margin: 0; }
 
 /* --------------------------------------------------- salas (canais) --- */
@@ -418,8 +453,23 @@ code {
   color: var(--accent);
 }
 
-@media (max-width: 1040px) {
-  .workspace { grid-template-columns: minmax(0, 1fr) 300px; }
+/* A janela do app abre com 1180 e não desce de 940, então as duas primeiras
+   faixas cobrem o uso normal. A terceira é pra quando o painel é aberto num
+   navegador em janela pequena: aí as três colunas não cabem lado a lado e o
+   chat/ajustes vai pra uma linha embaixo — some seria pior, é por ali que se
+   convida gente e se mexe nos ajustes. */
+@media (max-width: 1099px) {
+  .workspace { grid-template-columns: 210px minmax(0, 1fr) 270px; gap: 10px; padding: 10px; }
   .statbar { grid-template-columns: repeat(3, 1fr); }
   .stat:nth-child(n+4) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(120px, 34%);
+  }
+  .channels { grid-row: 1 / 2; }
+  .stage { grid-column: 2 / 3; grid-row: 1 / 2; }
+  .sidebar { grid-column: 1 / -1; grid-row: 2 / 3; }
 }

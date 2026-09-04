@@ -1,7 +1,7 @@
 // Painel do host: captura a tela, mantém uma conexão com cada convidado e
 // retransmite a voz de todo mundo. Este navegador é o centro da estrela.
 
-import { $, $$, el, icon, toast, avatarFor, fmtDuration, fmtRate, fmtClock, copyText, createVoiceMeter } from "./ui.js";
+import { $, $$, el, icon, toast, avatarFor, initials, colorFor, fmtDuration, fmtRate, fmtClock, copyText, createVoiceMeter } from "./ui.js";
 import { Signal } from "./signal.js";
 import { Peer, displayConstraints, preferVideoCodecs, natMapping, isCgnatRange, MIC_CONSTRAINTS, trackRouter } from "./rtc.js";
 import { Grid } from "./grid.js";
@@ -1552,11 +1552,24 @@ function renderPeople() {
     );
   }
   $("#tab-count").textContent = state.peers.size;
+  renderUserbar();
   updateBitrateHint(Number(state.settings.bitrate_kbps));
 }
 
 /** As salas aparecem dentro da própria lista de pessoas. */
 const renderSalas = renderPeople;
+
+/** O rodapé da coluna da esquerda: quem você é e em que sala está. */
+function renderUserbar() {
+  const nome = state.settings?.display_name || "Você";
+  const sala = state.salas.find((s) => s.id === minhaSala());
+  $("#room-title").textContent = state.settings?.room_name || "Sala";
+  $("#me-name").textContent = nome;
+  $("#me-sala").textContent = sala ? sala.name : "—";
+  const av = $("#me-avatar");
+  av.textContent = initials(nome);
+  av.style.background = `linear-gradient(140deg, ${colorFor(myId() + nome)}, ${colorFor(nome)})`;
+}
 
 function rowFor(info, isMe, entry) {
   const status = entry?.conn === "connected" ? "conectado"

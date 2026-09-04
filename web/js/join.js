@@ -241,12 +241,11 @@ function connect(name) {
       state.me.sala = m.sala;
       const nome = state.salas.find((s) => s.id === m.sala)?.name || m.sala;
       toast(`Você foi para ${nome}.`, "ok");
-      // Quem ficou pra trás some da grade: o host para de mandar essas telas.
-      for (const [id] of [...state.grid.tiles]) {
-        if (id !== state.me.id && state.people.get(id)?.sala !== m.sala) state.grid.remove(id);
-      }
-      updateWaitingState();
     }
+    // Vale pros dois casos — eu mudando de sala, ou alguém saindo da minha.
+    // O host para de encaminhar a tela dela, mas o card ficaria aí, parado
+    // no último quadro, se ninguém o tirasse.
+    limparGradeForaDaSala();
     renderPeople();
   });
   sig.on("state", (m) => {
@@ -291,6 +290,18 @@ function setNet(kind, text) {
  * mensagem de "ao vivo" é o que evita a tela travada em "pausado" — o mesmo
  * jeito errado que antes só um sair-e-voltar da sala resolvia.
  */
+/** Tira da grade a tela de quem não está mais na minha sala. */
+function limparGradeForaDaSala() {
+  const minha = state.me?.sala;
+  if (!minha) return;
+  for (const id of [...state.grid.tiles.keys()]) {
+    if (id === state.me.id) continue;              // a minha própria fica
+    const dono = state.people.get(id);
+    if (dono && dono.sala !== minha) state.grid.remove(id);
+  }
+  updateWaitingState();
+}
+
 function updateWaitingState() {
   $("#live-pill").hidden = state.live.size === 0;
   if (state.grid.count > 0) { hideWaiting(); return; }
